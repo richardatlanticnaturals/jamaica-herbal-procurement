@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Check, Send, Clock } from "lucide-react";
+import { ArrowLeft, Check, Send, Clock, Download, Mail } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700",
@@ -35,6 +35,8 @@ export default function PODetailPage() {
   const [po, setPo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [emailPreview, setEmailPreview] = useState<any>(null);
+  const [sendStatus, setSendStatus] = useState<string | null>(null);
 
   const loadPO = useCallback(async () => {
     try {
@@ -68,13 +70,35 @@ export default function PODetailPage() {
 
   const handleSend = async () => {
     setActionLoading(true);
+    setSendStatus(null);
     try {
+      // Step 1: Get the email preview data
+      const emailRes = await fetch(`/api/po/${params.id}/email`, { method: "POST" });
+      if (!emailRes.ok) throw new Error("Failed to generate email");
+      const { emailData } = await emailRes.json();
+      setEmailPreview(emailData);
+    } catch (err) {
+      console.error("Failed to prepare email:", err);
+      setSendStatus("Failed to prepare email");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const confirmSend = async () => {
+    if (!emailPreview) return;
+    setActionLoading(true);
+    setSendStatus("Sending...");
+    try {
+      // Mark as SENT in the database
       const res = await fetch(`/api/po/${params.id}/send`, { method: "POST" });
       if (res.ok) {
+        setSendStatus(`Email ready for ${emailPreview.to}. PO marked as sent.`);
+        setEmailPreview(null);
         loadPO();
       }
     } catch (err) {
-      console.error("Failed to send:", err);
+      setSendStatus("Failed to send");
     } finally {
       setActionLoading(false);
     }
@@ -121,6 +145,12 @@ export default function PODetailPage() {
           <Badge className={`text-sm px-3 py-1 ${statusColors[po.status] || ""}`}>
             {po.status.replace(/_/g, " ")}
           </Badge>
+          <a href={`/api/po/${params.id}/pdf`} target="_blank" rel="noopener">
+            <Button variant="outline" size="sm">
+              <Download className="mr-2 h-4 w-4" />
+              PDF
+            </Button>
+          </a>
           {po.status === "DRAFT" && (
             <Button size="sm" onClick={handleApprove} disabled={actionLoading}>
               <Check className="mr-2 h-4 w-4" />
@@ -131,6 +161,12 @@ export default function PODetailPage() {
             <Button size="sm" onClick={handleSend} disabled={actionLoading}>
               <Send className="mr-2 h-4 w-4" />
               Send to Vendor
+            </Button>
+          )}
+          {po.status === "SENT" && po.vendor?.email && (
+            <Button size="sm" variant="outline" onClick={handleSend} disabled={actionLoading}>
+              <Mail className="mr-2 h-4 w-4" />
+              Resend Email
             </Button>
           )}
         </div>
@@ -257,6 +293,67 @@ export default function PODetailPage() {
             <p className="text-sm">{po.notes}</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Send Status */}
+      {sendStatus && (
+        <div className={`rounded-lg px-4 py-3 text-sm ${sendStatus.includes("Failed") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+          {sendStatus}
+        </div>
+      )}
+
+      {/* Email Preview Modal */}
+      {emailPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="mx-4 w-full max-w-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Send Purchase Order Email
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2 text-sm">
+                <div className="flex gap-2">
+                  <span className="font-medium text-muted-foreground w-16">To:</span>
+                  <span>{emailPreview.to}</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="font-medium text-muted-foreground w-16">Subject:</span>
+                  <span>{emailPreview.subject}</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="font-medium text-muted-foreground w-16">From:</span>
+                  <span>jamaicanherbal@gmail.com</span>
+                </div>
+              </div>
+
+              <div className="rounded border bg-muted/30 p-3 text-xs max-h-48 overflow-y-auto">
+                <p className="text-muted-foreground">
+                  PO {emailPreview.poNumber} for {emailPreview.vendorName} with line items table and Jamaica Herbal branding.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setEmailPreview(null); setSendStatus(null); }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={confirmSend}
+                  disabled={actionLoading}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  {actionLoading ? "Sending..." : "Confirm & Send"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
