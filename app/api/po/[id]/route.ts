@@ -1,0 +1,63 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const po = await prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: {
+        vendor: true,
+        lineItems: {
+          include: {
+            inventoryItem: {
+              select: { id: true, name: true, sku: true, currentStock: true },
+            },
+          },
+        },
+        statusHistory: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!po) {
+      return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ po });
+  } catch (error) {
+    console.error("Failed to fetch PO:", error);
+    return NextResponse.json({ error: "Failed to fetch purchase order" }, { status: 500 });
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+
+    const po = await prisma.purchaseOrder.update({
+      where: { id },
+      data: {
+        notes: body.notes,
+        locationCode: body.locationCode,
+      },
+      include: {
+        vendor: true,
+        lineItems: { include: { inventoryItem: true } },
+      },
+    });
+
+    return NextResponse.json({ po });
+  } catch (error) {
+    console.error("Failed to update PO:", error);
+    return NextResponse.json({ error: "Failed to update purchase order" }, { status: 500 });
+  }
+}

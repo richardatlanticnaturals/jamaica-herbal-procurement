@@ -1,24 +1,189 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { FileText, Plus, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+
+const statusColors: Record<string, string> = {
+  DRAFT: "bg-gray-100 text-gray-700",
+  PENDING_APPROVAL: "bg-yellow-100 text-yellow-700",
+  APPROVED: "bg-blue-100 text-blue-700",
+  SENT: "bg-purple-100 text-purple-700",
+  CONFIRMED: "bg-green-100 text-green-700",
+  PARTIALLY_RECEIVED: "bg-orange-100 text-orange-700",
+  RECEIVED: "bg-green-200 text-green-800",
+  CANCELLED: "bg-red-100 text-red-700",
+  CLOSED: "bg-gray-200 text-gray-600",
+};
 
 export default function PurchaseOrdersPage() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [genResult, setGenResult] = useState<string | null>(null);
+
+  const loadOrders = useCallback(async (p: number) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/po?page=${p}&limit=20`);
+      const data = await res.json();
+      setOrders(data.orders || []);
+      setTotal(data.total || 0);
+      setTotalPages(data.totalPages || 1);
+    } catch (err) {
+      console.error("Failed to load POs:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrders(page);
+  }, [page, loadOrders]);
+
+  const handleAutoGenerate = async () => {
+    setGenerating(true);
+    setGenResult(null);
+    try {
+      const res = await fetch("/api/po/auto-generate", { method: "POST" });
+      const data = await res.json();
+      setGenResult(data.message);
+      loadOrders(1);
+      setPage(1);
+    } catch (err) {
+      setGenResult("Failed to auto-generate POs");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Purchase Orders</h1>
-        <p className="text-muted-foreground">
-          Create, manage, and track purchase orders
-        </p>
-      </div>
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-            <FileText className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className="mt-4 text-lg font-semibold">Coming in Phase 2</h3>
-          <p className="mt-2 text-sm text-muted-foreground text-center max-w-sm">
-            Auto-generate purchase orders from low stock items, approve and email them to vendors.
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Purchase Orders</h1>
+          <p className="text-muted-foreground">
+            {total > 0 ? `${total} purchase orders` : "Create and manage purchase orders"}
           </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAutoGenerate}
+            disabled={generating}
+          >
+            <Zap className="mr-2 h-4 w-4" />
+            {generating ? "Generating..." : "Auto-Generate POs"}
+          </Button>
+        </div>
+      </div>
+
+      {genResult && (
+        <div className={`rounded-lg px-4 py-3 text-sm ${genResult.includes("Failed") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+          {genResult}
+        </div>
+      )}
+
+      <Card>
+        <CardContent className="p-0">
+          {loading && orders.length === 0 ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground">
+              Loading purchase orders...
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                <FileText className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold">No purchase orders</h3>
+              <p className="mt-2 text-sm text-muted-foreground text-center max-w-sm">
+                Click "Auto-Generate POs" to create purchase orders for all items below their reorder point.
+              </p>
+              <Button
+                size="sm"
+                className="mt-4"
+                onClick={handleAutoGenerate}
+                disabled={generating}
+              >
+                <Zap className="mr-2 h-4 w-4" />
+                Auto-Generate POs
+              </Button>
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>PO Number</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-center">Items</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead>Created</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orders.map((po) => (
+                    <TableRow key={po.id} className="cursor-pointer hover:bg-muted/50">
+                      <TableCell>
+                        <Link href={`/po/${po.id}`} className="font-mono text-sm font-medium text-blue-600 hover:underline">
+                          {po.poNumber}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {po.vendor?.name || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={statusColors[po.status] || "bg-gray-100"}>
+                          {po.status.replace(/_/g, " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {po._count?.lineItems || 0}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        ${Number(po.total).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(po.createdAt).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t px-4 py-3">
+                  <p className="text-sm text-muted-foreground">
+                    Page {page} of {totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}>
+                      <ChevronLeft className="h-4 w-4" /> Previous
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>
+                      Next <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

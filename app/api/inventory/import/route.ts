@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     if (errors.length > 0) {
       return NextResponse.json(
-        { error: "CSV parse errors", details: errors },
+        { error: "CSV parse errors", details: errors.slice(0, 5) },
         { status: 400 }
       );
     }
@@ -30,93 +30,133 @@ export async function POST(request: NextRequest) {
     let updated = 0;
     let skipped = 0;
 
-    for (const row of rows) {
-      // Map common CSV column names to our fields
-      const sku =
-        row["SKU"] || row["sku"] || row["Item Number"] || row["ItemNumber"] || row["Code"];
-      const name =
-        row["Name"] || row["name"] || row["Description"] || row["Item Name"] || row["ItemName"];
+    // Cache vendors to avoid repeated DB lookups
+    const vendorCache = new Map<string, string>();
 
-      if (!sku || !name) {
+    for (const row of rows) {
+      // Comcash column mapping (also supports generic column names)
+      const name =
+        row["productTitle"] || row["Name"] || row["name"] || row["Description"] || row["Item Name"];
+      const sku =
+        row["sku"] || row["SKU"] || row["Item Number"] || row["Code"];
+      const upc =
+        row["upc"] || row["UPC"] || "";
+      const comcashItemId =
+        row["productId"] || "";
+
+      // Use SKU first, fall back to UPC, then comcash product ID
+      const itemKey = sku || upc || (comcashItemId ? `CC-${comcashItemId}` : "");
+
+      if (!itemKey || !name) {
         skipped++;
         continue;
       }
 
-      const costPrice = parseFloat(
-        row["Cost"] || row["cost"] || row["Cost Price"] || row["CostPrice"] || "0"
-      );
-      const retailPrice = parseFloat(
-        row["Price"] || row["price"] || row["Retail"] || row["RetailPrice"] || "0"
-      );
-      const currentStock = parseInt(
-        row["Qty"] || row["qty"] || row["Stock"] || row["Quantity"] || row["On Hand"] || "0",
-        10
-      );
-      const reorderPoint = parseInt(
-        row["Reorder Point"] || row["ReorderPoint"] || row["Min"] || "5",
-        10
-      );
-      const category =
-        row["Category"] || row["category"] || row["Department"] || null;
-      const vendorName =
-        row["Vendor"] || row["vendor"] || row["Supplier"] || null;
+      // Skip deleted/inactive products
+      const status = row["status"] || "1";
+      if (status === "0" || status === "deleted") {
+        skipped++;
+        continue;
+      }
 
-      // Find or create vendor if specified
+      const costPrice = parseFloat(row["lastCost"] || row["Cost"] || row["cost"] || "0") || 0;
+      const retailPrice = parseFloat(row["price"] || row["Price"] || row["Retail"] || "0") || 0;
+      const currentStock = Math.floor(
+        parseFloat(row["warehouseQuantity"] || row["Qty"] || row["Stock"] || row["Quantity"] || "0") || 0
+      );
+      const minStock = parseInt(row["minStockLevel"] || row["Reorder Point"] || row["Min"] || "0", 10) || 0;
+      const maxStock = parseInt(row["maxStockLevel"] || "0", 10) || 0;
+      const reorderPoint = minStock || 5;
+      const reorderQty = maxStock > minStock ? maxStock - minStock : 12;
+      const category =
+        row["categoryTitle"] || row["Category"] || row["category"] || null;
+      const vendorIdComcash =
+        row["primaryVendorId"] || "";
+      const vendorSku =
+        row["vendorProductId"] || "";
+      const unitOfMeasure =
+        row["sellUOMTitle"] || row["UOMGroupTitle"] || "each";
+      const warehouseTitle =
+        row["warehouseTitle"] || "";
+
+      // Determine location stock from warehouse title
+      let locationLL = 0;
+      let locationNL = 0;
+      if (warehouseTitle.includes("Lauderdale Lakes")) {
+        locationLL = currentStock;
+      } else if (warehouseTitle.includes("North Lauderdale")) {
+        locationNL = currentStock;
+      }
+
+      // Find or create vendor by comcash vendor ID
       let vendorId: string | null = null;
-      if (vendorName) {
-        let vendor = await prisma.vendor.findFirst({
-          where: { name: vendorName },
-        });
-        if (!vendor) {
-          vendor = await prisma.vendor.create({ data: { name: vendorName } });
+      if (vendorIdComcash) {
+        const cacheKey = vendorIdComcash;
+        if (vendorCache.has(cacheKey)) {
+          vendorId = vendorCache.get(cacheKey)!;
+        } else {
+          // For now, create vendor with comcash ID as name (we'll update names later)
+          let vendor = await prisma.vendor.findFirst({
+            where: { name: `Vendor-${vendorIdComcash}` },
+          });
+          if (!vendor) {
+            vendor = await prisma.vendor.create({
+              data: { name: `Vendor-${vendorIdComcash}` },
+            });
+          }
+          vendorId = vendor.id;
+          vendorCache.set(cacheKey, vendorId);
         }
-        vendorId = vendor.id;
       }
 
       // Upsert inventory item by SKU
       const existing = await prisma.inventoryItem.findUnique({
-        where: { sku },
+        where: { sku: itemKey },
       });
+
+      const itemData = {
+        name,
+        costPrice,
+        retailPrice,
+        currentStock,
+        reorderPoint,
+        reorderQty,
+        category: category === "NONE" ? null : category,
+        vendorId: vendorId,
+        vendorSku: vendorSku || null,
+        comcashItemId: comcashItemId || null,
+        unitOfMeasure,
+        locationLL,
+        locationNL,
+        lastSyncedAt: new Date(),
+      };
 
       if (existing) {
         await prisma.inventoryItem.update({
-          where: { sku },
+          where: { sku: itemKey },
           data: {
-            name,
-            costPrice,
-            retailPrice,
-            currentStock,
-            reorderPoint,
-            category,
+            ...itemData,
             vendorId: vendorId || existing.vendorId,
-            lastSyncedAt: new Date(),
           },
         });
         updated++;
       } else {
         await prisma.inventoryItem.create({
           data: {
-            sku,
-            name,
-            costPrice,
-            retailPrice,
-            currentStock,
-            reorderPoint,
-            category,
-            vendorId,
-            lastSyncedAt: new Date(),
+            sku: itemKey,
+            ...itemData,
           },
         });
         imported++;
       }
     }
 
-    // Fetch all items to return
-    const items = await prisma.inventoryItem.findMany({
-      where: { isActive: true },
-      orderBy: { name: "asc" },
-      include: {
-        vendor: { select: { id: true, name: true } },
+    // Return summary (don't fetch all 4000+ items at once)
+    const totalItems = await prisma.inventoryItem.count({ where: { isActive: true } });
+    const lowStock = await prisma.inventoryItem.count({
+      where: {
+        isActive: true,
+        currentStock: { lte: prisma.inventoryItem.fields.reorderPoint ? 5 : 5 },
       },
     });
 
@@ -125,10 +165,13 @@ export async function POST(request: NextRequest) {
       imported,
       updated,
       skipped,
-      items,
+      totalItems,
     });
   } catch (error) {
     console.error("CSV import failed:", error);
-    return NextResponse.json({ error: "Import failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Import failed", details: String(error) },
+      { status: 500 }
+    );
   }
 }
