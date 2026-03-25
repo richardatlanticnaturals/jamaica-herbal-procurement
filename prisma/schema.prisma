@@ -61,12 +61,13 @@ model VerificationToken {
 // ============================================
 
 model Vendor {
-  id             String      @id @default(cuid())
-  name           String
-  contactName    String?
-  email          String?
-  phone          String?
-  website        String?
+  id              String      @id @default(cuid())
+  comcashVendorId String?     @unique
+  name            String
+  contactName     String?
+  email           String?
+  phone           String?
+  website         String?
   orderMethod    OrderMethod @default(EMAIL)
   portalUrl      String?
   portalUsername String?
@@ -230,6 +231,9 @@ model AppSettings {
   nextPoSequence      Int      @default(1)
   syncIntervalMinutes Int      @default(60)
   lastInventorySync   DateTime?
+  lastVendorSync      DateTime?
+  defaultReorderPoint Int      @default(5)
+  defaultReorderQty   Int      @default(12)
 }
 
 // ============================================

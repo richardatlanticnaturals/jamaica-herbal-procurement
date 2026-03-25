@@ -244,7 +244,7 @@ export default function PODetailPage() {
 
           <div className="border-t px-4 py-3 text-right">
             <span className="text-sm text-muted-foreground mr-4">Subtotal:</span>
-            <span className="text-lg font-bold">${Number(po.total).toFixed(2)}</span>
+            <span className="text-lg font-bold">${Number(po.subtotal).toFixed(2)}</span>
           </div>
         </CardContent>
       </Card>

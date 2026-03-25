@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Papa from "papaparse";
+import { requireAuth } from "@/lib/api-auth";
 
 export async function POST(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    // Fix #10: File size limit (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: "File too large. Maximum size is 10MB." },
+        { status: 400 }
+      );
     }
 
     const text = await file.text();
@@ -153,12 +165,6 @@ export async function POST(request: NextRequest) {
 
     // Return summary (don't fetch all 4000+ items at once)
     const totalItems = await prisma.inventoryItem.count({ where: { isActive: true } });
-    const lowStock = await prisma.inventoryItem.count({
-      where: {
-        isActive: true,
-        currentStock: { lte: prisma.inventoryItem.fields.reorderPoint ? 5 : 5 },
-      },
-    });
 
     return NextResponse.json({
       message: `Imported ${imported} new items, updated ${updated}, skipped ${skipped}`,
@@ -170,7 +176,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("CSV import failed:", error);
     return NextResponse.json(
-      { error: "Import failed", details: String(error) },
+      { error: "Import failed. Please check the CSV format and try again." },
       { status: 500 }
     );
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/api-auth";
 
 interface ConfirmLineItem {
   receivingLineItemId: string;
@@ -16,6 +17,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const { id } = await params;
     const body = await request.json();
@@ -45,6 +49,14 @@ export async function POST(
       return NextResponse.json(
         { error: "Receiving not found" },
         { status: 404 }
+      );
+    }
+
+    // Idempotency check — prevent double-confirm from doubling inventory
+    if (receiving.matchStatus !== "PENDING") {
+      return NextResponse.json(
+        { error: "This receiving has already been confirmed" },
+        { status: 409 }
       );
     }
 
@@ -114,36 +126,38 @@ export async function POST(
       );
       const someReceived = updatedPoLines.some((pl) => pl.qtyReceived > 0);
 
-      let newPoStatus: "RECEIVED" | "PARTIALLY_RECEIVED";
+      let newPoStatus: "RECEIVED" | "PARTIALLY_RECEIVED" | null;
       if (allFullyReceived) {
         newPoStatus = "RECEIVED";
       } else if (someReceived) {
         newPoStatus = "PARTIALLY_RECEIVED";
       } else {
-        newPoStatus = "PARTIALLY_RECEIVED";
+        newPoStatus = null; // Don't change status if nothing was received
       }
 
       const previousStatus = receiving.purchaseOrder.status;
 
-      // Update PO status
-      await tx.purchaseOrder.update({
-        where: { id: receiving.purchaseOrderId },
-        data: {
-          status: newPoStatus,
-          receivedAt: allFullyReceived ? new Date() : undefined,
-        },
-      });
+      // Update PO status only if there's something to update
+      if (newPoStatus) {
+        await tx.purchaseOrder.update({
+          where: { id: receiving.purchaseOrderId },
+          data: {
+            status: newPoStatus,
+            receivedAt: allFullyReceived ? new Date() : undefined,
+          },
+        });
 
-      // 5. Create POStatusLog entry
-      await tx.pOStatusLog.create({
-        data: {
-          purchaseOrderId: receiving.purchaseOrderId,
-          fromStatus: previousStatus,
-          toStatus: newPoStatus,
-          note: `Receiving ${id} confirmed — ${lineItems.length} line items processed`,
-          triggeredBy: "receiving",
-        },
-      });
+        // Create POStatusLog entry
+        await tx.pOStatusLog.create({
+          data: {
+            purchaseOrderId: receiving.purchaseOrderId,
+            fromStatus: previousStatus,
+            toStatus: newPoStatus,
+            note: `Receiving ${id} confirmed — ${lineItems.length} line items processed`,
+            triggeredBy: "receiving",
+          },
+        });
+      }
 
       // 6. Update Receiving match status
       const hasUnmatched = lineItems.some(

@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ocrDeliverySlip } from "@/lib/ocr-delivery";
 import { matchDeliveryToPO, type POLineItemForMatch } from "@/lib/fuzzy-match";
+import { requireAuth } from "@/lib/api-auth";
 
 /**
  * GET /api/receiving
  * List all receiving records with associated PO info.
  */
 export async function GET(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1", 10);
@@ -55,6 +59,9 @@ export async function GET(request: NextRequest) {
  * Body: { purchaseOrderId: string, image: string (base64) }
  */
 export async function POST(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { purchaseOrderId, image } = body;
@@ -153,8 +160,11 @@ export async function POST(request: NextRequest) {
     });
 
     // Enrich the response with match details for the UI
-    const enrichedLineItems = receiving.lineItems.map((li, idx) => {
-      const match = matchResult.matches[idx];
+    // Match by ocrDescription instead of array index (Prisma order not guaranteed)
+    const enrichedLineItems = receiving.lineItems.map((li) => {
+      const match = matchResult.matches.find(
+        (m) => m.ocrItem.name === li.ocrDescription
+      );
       return {
         ...li,
         matchStatus: match?.status ?? "UNMATCHED",

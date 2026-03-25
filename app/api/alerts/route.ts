@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/api-auth";
 
 export interface AlertItem {
   id: string;
@@ -19,6 +20,9 @@ export interface AlertItem {
  * Covers the last 7 days by default (configurable via ?days= query param).
  */
 export async function GET(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get("days") || "7", 10);

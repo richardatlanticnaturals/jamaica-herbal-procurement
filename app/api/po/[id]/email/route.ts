@@ -1,10 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/api-auth";
+
+/** Escape HTML special characters to prevent XSS */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const { id } = await params;
 
@@ -37,8 +51,8 @@ export async function POST(
         (item, i) =>
           `<tr style="border-bottom:1px solid #eee;">
             <td style="padding:8px;">${i + 1}</td>
-            <td style="padding:8px;">${item.inventoryItem?.sku || item.vendorSku || "—"}</td>
-            <td style="padding:8px;">${item.description}</td>
+            <td style="padding:8px;">${escapeHtml(item.inventoryItem?.sku || item.vendorSku || "—")}</td>
+            <td style="padding:8px;">${escapeHtml(item.description)}</td>
             <td style="padding:8px;text-align:center;">${item.qtyOrdered}</td>
             <td style="padding:8px;text-align:right;">$${Number(item.unitCost).toFixed(2)}</td>
             <td style="padding:8px;text-align:right;">$${Number(item.lineTotal).toFixed(2)}</td>
@@ -54,12 +68,12 @@ export async function POST(
         </div>
 
         <div style="padding:24px;border:1px solid #eee;border-top:none;">
-          <p>Dear ${po.vendor.contactName || po.vendor.name},</p>
+          <p>Dear ${escapeHtml(po.vendor.contactName || po.vendor.name)},</p>
 
-          <p>Please find our purchase order <strong>${po.poNumber}</strong> below. We would appreciate confirmation of receipt and expected delivery date.</p>
+          <p>Please find our purchase order <strong>${escapeHtml(po.poNumber)}</strong> below. We would appreciate confirmation of receipt and expected delivery date.</p>
 
           <div style="background:#f8f8f8;padding:12px;border-radius:6px;margin:16px 0;">
-            <strong>PO Number:</strong> ${po.poNumber}<br>
+            <strong>PO Number:</strong> ${escapeHtml(po.poNumber)}<br>
             <strong>Date:</strong> ${new Date(po.createdAt).toLocaleDateString()}<br>
             ${po.expectedDate ? `<strong>Requested Delivery:</strong> ${new Date(po.expectedDate).toLocaleDateString()}<br>` : ""}
           </div>
@@ -86,7 +100,7 @@ export async function POST(
             </span>
           </div>
 
-          ${po.notes ? `<div style="margin-top:16px;padding:12px;background:#fff9e6;border-radius:6px;border-left:4px solid #FFB81C;"><strong>Notes:</strong> ${po.notes}</div>` : ""}
+          ${po.notes ? `<div style="margin-top:16px;padding:12px;background:#fff9e6;border-radius:6px;border-left:4px solid #FFB81C;"><strong>Notes:</strong> ${escapeHtml(po.notes)}</div>` : ""}
 
           <p style="margin-top:24px;">Please reply to this email with your confirmation and estimated delivery date. If any items are unavailable, please let us know as soon as possible so we can arrange alternatives.</p>
 
@@ -111,7 +125,7 @@ export async function POST(
     return NextResponse.json({
       emailData: {
         to: po.vendor.email,
-        subject: `Purchase Order ${po.poNumber} - Jamaica Herbal`,
+        subject: `Purchase Order ${escapeHtml(po.poNumber)} - Jamaica Herbal`,
         body: emailBody,
         bodyType: "html",
         poNumber: po.poNumber,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseVendorEmail, ParsedEmailResult } from "@/lib/parse-vendor-email";
 import { POStatus } from "@/lib/generated/prisma/enums";
+import { requireAuth } from "@/lib/api-auth";
 
 /**
  * POST /api/email/parse
@@ -9,6 +10,9 @@ import { POStatus } from "@/lib/generated/prisma/enums";
  * and updates the matching PO status + creates status log entries.
  */
 export async function POST(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { subject, body: emailBody, from, messageId } = body;
@@ -115,16 +119,18 @@ export async function POST(request: NextRequest) {
         poUpdated = true;
       }
 
-      // Create status log entry
-      await prisma.pOStatusLog.create({
-        data: {
-          purchaseOrderId: matchedPo.id,
-          fromStatus: matchedPo.status,
-          toStatus: newStatus || matchedPo.status,
-          note: buildStatusNote(parsed, from),
-          triggeredBy: "email-parser",
-        },
-      });
+      // Create status log entry only if something changed
+      if (poUpdated || parsed.outOfStockItems.length > 0) {
+        await prisma.pOStatusLog.create({
+          data: {
+            purchaseOrderId: matchedPo.id,
+            fromStatus: matchedPo.status,
+            toStatus: newStatus || matchedPo.status,
+            note: buildStatusNote(parsed, from),
+            triggeredBy: "email-parser",
+          },
+        });
+      }
 
       // Mark out-of-stock items on the PO line items
       if (parsed.outOfStockItems.length > 0) {
@@ -182,7 +188,7 @@ function mapParsedStatusToPOStatus(
     case "confirmed":
       return "CONFIRMED";
     case "partial":
-      return "PARTIALLY_RECEIVED";
+      return "CONFIRMED"; // Partial confirmation, not partial physical receipt
     case "rejected":
       return "CANCELLED";
     case "out_of_stock":

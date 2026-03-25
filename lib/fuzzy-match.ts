@@ -225,7 +225,7 @@ export function matchDeliveryToPO(
     if (!match || match.confidence < 0.5) {
       return {
         ocrItem,
-        poLineItem: match ? poLineItems[match.poIdx] : null,
+        poLineItem: null, // Don't expose low-confidence matches
         confidence: match?.confidence ?? 0,
         status: "UNMATCHED" as const,
       };
