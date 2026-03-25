@@ -23,7 +23,10 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { lineItems } = body as { lineItems: ConfirmLineItem[] };
+    const { lineItems, locationCode } = body as {
+      lineItems: ConfirmLineItem[];
+      locationCode?: "LL" | "NL";
+    };
 
     if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
       return NextResponse.json(
@@ -103,14 +106,20 @@ export async function POST(
             });
           }
 
-          // 3. Update InventoryItem.currentStock
+          // 3. Update InventoryItem.currentStock and location-specific stock
+          const stockUpdateData: Record<string, any> = {
+            currentStock: {
+              increment: item.qtyReceived,
+            },
+          };
+          if (locationCode === "LL") {
+            stockUpdateData.locationLL = { increment: item.qtyReceived };
+          } else if (locationCode === "NL") {
+            stockUpdateData.locationNL = { increment: item.qtyReceived };
+          }
           await tx.inventoryItem.update({
             where: { id: recLine.inventoryItemId },
-            data: {
-              currentStock: {
-                increment: item.qtyReceived,
-              },
-            },
+            data: stockUpdateData,
           });
         }
       }
