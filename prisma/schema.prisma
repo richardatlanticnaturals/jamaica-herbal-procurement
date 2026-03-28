@@ -232,6 +232,7 @@ model AppSettings {
   syncIntervalMinutes Int      @default(60)
   lastInventorySync   DateTime?
   lastVendorSync      DateTime?
+  lastProductSync     DateTime?
   defaultReorderPoint Int      @default(5)
   defaultReorderQty   Int      @default(12)
 }

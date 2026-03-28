@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/api-auth";
 import { fetchVendors } from "@/lib/comcash";
 
 /**
@@ -8,6 +9,9 @@ import { fetchVendors } from "@/lib/comcash";
  * Matches by comcashVendorId (or name fallback), skips vendors named "NONE".
  */
 export async function POST() {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const comcashVendors = await fetchVendors();
 
@@ -16,7 +20,8 @@ export async function POST() {
     let skipped = 0;
 
     for (const cv of comcashVendors) {
-      const vendorName = (cv.vendor_name || "").trim();
+      // V2 API uses 'name', legacy uses 'vendor_name' — handle both
+      const vendorName = ((cv as any).name || (cv as any).vendor_name || "").trim();
 
       // Skip vendors with name "NONE" or empty
       if (!vendorName || vendorName.toUpperCase() === "NONE") {
@@ -24,7 +29,7 @@ export async function POST() {
         continue;
       }
 
-      const comcashId = String(cv.vendor_id);
+      const comcashId = String((cv as any).id || (cv as any).vendor_id);
 
       // Try to find existing vendor by comcashVendorId first
       let existing = await prisma.vendor.findUnique({
@@ -40,45 +45,39 @@ export async function POST() {
         });
       }
 
+      const phone = cv.phone || "";
+      const email = cv.email || "";
+
       if (existing) {
-        // Update existing vendor
         await prisma.vendor.update({
           where: { id: existing.id },
           data: {
             comcashVendorId: comcashId,
             name: vendorName,
-            phone: cv.phone || existing.phone,
-            email: cv.email || existing.email,
-            contactName: cv.contact_name || existing.contactName,
+            phone: phone || existing.phone,
+            email: email || existing.email,
           },
         });
         updated++;
       } else {
-        // Create new vendor
         await prisma.vendor.create({
           data: {
             comcashVendorId: comcashId,
             name: vendorName,
-            phone: cv.phone || null,
-            email: cv.email || null,
-            contactName: cv.contact_name || null,
-            isActive: cv.is_active !== false,
+            phone: phone || null,
+            email: email || null,
+            isActive: true,
           },
         });
         created++;
       }
     }
 
-    // Update last sync timestamp in AppSettings
+    // Update last sync timestamp
     await prisma.appSettings.upsert({
       where: { id: "singleton" },
-      create: {
-        id: "singleton",
-        lastVendorSync: new Date(),
-      },
-      update: {
-        lastVendorSync: new Date(),
-      },
+      create: { id: "singleton", lastVendorSync: new Date() },
+      update: { lastVendorSync: new Date() },
     });
 
     return NextResponse.json({
@@ -92,10 +91,7 @@ export async function POST() {
   } catch (error) {
     console.error("Comcash vendor sync failed:", error);
     return NextResponse.json(
-      {
-        error: "Vendor sync failed",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Vendor sync failed" },
       { status: 500 }
     );
   }
