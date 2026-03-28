@@ -11,10 +11,44 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "20", 10);
     const status = searchParams.get("status") || "";
+    // Search by PO number or vendor name
+    const search = searchParams.get("search") || "";
+    // Date range filters on createdAt
+    const dateFrom = searchParams.get("dateFrom") || "";
+    const dateTo = searchParams.get("dateTo") || "";
+
+    const vendorId = searchParams.get("vendorId") || "";
 
     const where: any = {};
+
     if (status) {
       where.status = status;
+    }
+    // Filter by vendor if provided
+    if (vendorId) {
+      where.vendorId = vendorId;
+    }
+
+    // Search: match poNumber (contains) OR vendor name (contains)
+    if (search) {
+      where.OR = [
+        { poNumber: { contains: search, mode: "insensitive" } },
+        { vendor: { name: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    // Date range filter on createdAt
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) {
+        where.createdAt.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        // Include the entire "dateTo" day by setting to end of day
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = endDate;
+      }
     }
 
     const [orders, total] = await Promise.all([

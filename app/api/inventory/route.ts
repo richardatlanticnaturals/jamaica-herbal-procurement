@@ -13,7 +13,14 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const filter = searchParams.get("filter") || "all"; // all, low-stock, out-of-stock
 
+    const vendorId = searchParams.get("vendorId") || "";
+
     const where: any = { isActive: true };
+
+    // Filter by vendor if provided
+    if (vendorId) {
+      where.vendorId = vendorId;
+    }
 
     if (search) {
       where.OR = [

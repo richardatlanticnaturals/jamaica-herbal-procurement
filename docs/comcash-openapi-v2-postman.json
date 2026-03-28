@@ -1,0 +1,2925 @@
+{
+  "info": {
+    "_postman_id": "b964bc27-b483-470c-b89e-427aa93e9e99",
+    "name": "COMCASH_OPEN_API_V2_",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "53576538",
+    "_collection_link": "https://go.postman.co/collection/53576538-b964bc27-b483-470c-b89e-427aa93e9e99?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Auth / Signup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = JSON.parse(responseBody);",
+                  "postman.setEnvironmentVariable(\"jwt\", data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openApiKey\" : \"{{openApiKey}}\",\n  \"salesOutletId\": \"5\",\n  \"customSalesOutletId\": \"5\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"testuser@test.com\",\n  \"phone\": \"1234567\",\n  \"countryPhoneCode\": \"+1\",\n  \"password\": \"123456\",\n  \"repeatPassword\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/auth/signup",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "auth",
+                "signup"
+              ]
+            },
+            "description": "Sign up"
+          },
+          "response": []
+        },
+        {
+          "name": "Auth / Signin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = JSON.parse(responseBody);",
+                  "postman.setEnvironmentVariable(\"jwt\", data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openApiKey\" : \"{{openApiKey}}\",\n  \"salesOutletId\": \"54\",\n  \"customSalesOutletId\": \"5\",\n  \"phone\": \"660829802\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/auth/signin",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "auth",
+                "signin"
+              ]
+            },
+            "description": "Signin"
+          },
+          "response": []
+        },
+        {
+          "name": "Auth / Regenerate Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = JSON.parse(responseBody);",
+                  "postman.setEnvironmentVariable(\"jwt\", data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"customSalesOutletId\" : 2\n}"
+            },
+            "url": {
+              "raw": "{{url}}/auth/regenerate-token",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "auth",
+                "regenerate-token"
+              ]
+            },
+            "description": "Regenerate JWT token on change sales outlet id. On each change we set additional CSID paramater to JWT token, this paramater store ID of sales outlet that user has been choosed.\nThis new CSID become to be a current sales outlet."
+          },
+          "response": []
+        },
+        {
+          "name": "Auth / Verify Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = JSON.parse(responseBody);",
+                  "postman.setEnvironmentVariable(\"jwt\", data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openApiKey\" : \"{{openApiKey}}\",\n  \"salesOutletId\": \"5\",\n  \"customSalesOutletId\" : 2,\n  \"customerId\": \"11911\",\n  \"accessToken\": \"w7wbsrkxntawcpmuw5~u4f6u\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/auth/verify-customer",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "auth",
+                "verify-customer"
+              ]
+            },
+            "description": "\nGenerate JWT token based on access token, which was created on create customer with POS. The customer that have no password."
+          },
+          "response": []
+        },
+        {
+          "name": "Auth / Forgot Password (email)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = JSON.parse(responseBody);",
+                  "postman.setEnvironmentVariable(\"jwt\", data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openApiKey\" : \"{{openApiKey}}\",\n  \"salesOutletId\": 5,\n  \"email\": \"13testuser@test.com\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/auth/forgot-password",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Resset Password"
+          },
+          "response": []
+        },
+        {
+          "name": "Auth / Forgot Password (phone)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = JSON.parse(responseBody);",
+                  "postman.setEnvironmentVariable(\"jwt\", data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openApiKey\" : \"{{openApiKey}}\",\n  \"salesOutletId\": 5,\n  \"email\": \"11234567\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/auth/forgot-password",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Resset Password"
+          },
+          "response": []
+        },
+        {
+          "name": "Auth / Confirm Phone Number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = JSON.parse(responseBody);",
+                  "postman.setEnvironmentVariable(\"jwt\", data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openApiKey\" : \"{{openApiKey}}\",\n  \"countryPhoneCode\": \"1\",\n  \"phone\": \"5017122661\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/auth/confirm-phone",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "auth",
+                "confirm-phone"
+              ]
+            },
+            "description": "Confirm phone number.\nBODY request: \n{\n  \"openApiKey\" : \"{{openApiKey}}\",\n  \"countryPhoneCode\": \"1\",\n  \"phone\": \"5017122661\"\n}\n\nBODY response: \n{\n\t\"countryPhoneCode\": \"1\",\n    \"phone\": \"5017122661\",\n    \"exists\": false\n}\n\n\"exists\" boolean type, shows if the customer with given phone number exists."
+          },
+          "response": []
+        },
+        {
+          "name": "Auth / Send Secure Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = JSON.parse(responseBody);",
+                  "postman.setEnvironmentVariable(\"jwt\", data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openApiKey\" : \"{{openApiKey}}\",\n  \"countryPhoneCode\": \"1\",\n  \"phone\": \"5017122661\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/auth/send-secure-message?{{params}}",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "auth",
+                "send-secure-message"
+              ],
+              "query": [
+                {
+                  "key": "{{params}}",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Send SMS secure number. \nReturns response with status and sends SMS with secure number to the given phone.\nThe secret are valid for 60 minutes (one hour).\nClient can send request to Auth / Verify Secure Message with this secure number for getting temporary JWT token.\nThe given JWT token allows to set new password.\nBODY request: \n{\n  \"openApiKey\" : \"{{openApiKey}}\",\n  \"countryPhoneCode\": \"1\",\n  \"phone\": \"5017122661\"\n}\n\nBODY response:\n{\n\t\"countryPhoneCode\": \"380\",\n    \"phone\": \"984386471\",\n    \"status\": \"PENDING_DELIVERY\"\n}\n\n\"status\" available types:\nPENDING_DELIVERY: Message has been processed and sent for delivery.\nREJECTED_SYSTEM_ERROR: The request has been rejected due to system error."
+          },
+          "response": []
+        },
+        {
+          "name": "Auth / Verify Secure Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = JSON.parse(responseBody);",
+                  "postman.setEnvironmentVariable(\"jwt\", data.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"openApiKey\": \"{{openApiKey}}\",\n\t\"salesOutletId\": \"1\",\n\t\"countryPhoneCode\": \"1\",\n\t\"phone\": \"5017122661\",\n\t\"secret\": \"277945\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/auth/verify-secure-message",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "auth",
+                "verify-secure-message"
+              ]
+            },
+            "description": "Returns JWT token that can be used to set password in Customer / Set Password API endpoint.\n\nThe client has only three attempts, after three wrong attempts  the client will have to make another call to Auth/Send Secure Number to generate another secret."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Attribute Group",
+      "item": [
+        {
+          "name": "Attribute Group /List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/attribute-group/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "attribute-group",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Brand",
+      "item": [
+        {
+          "name": "Brand / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/brand/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "brand",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Category",
+      "item": [
+        {
+          "name": "Category / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/category/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "category",
+                "list"
+              ]
+            },
+            "description": "Get the list of categories."
+          },
+          "response": []
+        },
+        {
+          "name": "Category /View",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"categoryId\": 24\n}"
+            },
+            "url": {
+              "raw": "{{url}}/category/view",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "category",
+                "view"
+              ]
+            },
+            "description": "Get category"
+          },
+          "response": []
+        },
+        {
+          "name": "Category / Filters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"2\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/category/filters",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "category",
+                "filters"
+              ]
+            },
+            "description": "Get the list of filters by category."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Card on File",
+      "item": [
+        {
+          "name": "Card On File / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/card-on-file/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "card-on-file",
+                "list"
+              ]
+            },
+            "description": "Get all items."
+          },
+          "response": []
+        },
+        {
+          "name": "Card On File / Set Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/card-on-file/set-account",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "card-on-file",
+                "set-account"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Card On File / Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"paymentId\": \"345789klj673\",\n\t\"returnCode\": \"Complete\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/card-on-file/create",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "card-on-file",
+                "create"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Card On File / Set Primary",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"id\": 15\n}"
+            },
+            "url": {
+              "raw": "{{url}}/card-on-file/set-primary",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "card-on-file",
+                "set-primary"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Card On File / Delete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"id\": 15\n}"
+            },
+            "url": {
+              "raw": "{{url}}/card-on-file/delete",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "card-on-file",
+                "delete"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Cart / Calculate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"1002\",\n\t\t\t\"quantity\": \"2\",\n\t\t\t\"modifiers\": [\n\t\t\t\t{\n\t\t\t\t\t\"modifierId\": \"14\",\n\t\t\t\t\t\"groupId\": \"3\"\n\t\t\t\t}\n\t\t\t]\n\t\t},\n\t\t{\n\t\t\t\"productId\": \"1003\",\n\t\t\t\"quantity\": \"1\",\n\t\t\t\"modifiers\": []\n\t\t\t\n\t\t}\n\t]\n\n}"
+            },
+            "url": {
+              "raw": "{{url}}/cart/calculate",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "cart",
+                "calculate"
+              ]
+            },
+            "description": "Get all cart items."
+          },
+          "response": []
+        },
+        {
+          "name": "Cart / Validate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"1002\",\n\t\t\t\"quantity\": \"26\",\n\t\t\t\"modifiers\": [\n\t\t\t\t{\n\t\t\t\t\t\"modifierId\": \"14\",\n\t\t\t\t\t\"groupId\": \"3\"\n\t\t\t\t}\n\t\t\t]\n\t\t}\n\t]\n\n}"
+            },
+            "url": {
+              "raw": "{{url}}/cart/validate",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "cart",
+                "validate"
+              ]
+            },
+            "description": "Validate products in cart."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Checkout",
+      "item": [
+        {
+          "name": "Get delivery options",
+          "item": [
+            {
+              "name": "Checkout /  Options",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/options",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "options"
+                  ]
+                },
+                "description": "Get all available delivery options. Based on delivery settings of cusrrent sales outlet.\nTo make any requests on checkout, please make sure you have set any delivery options for sales outlet."
+              },
+              "response": []
+            },
+            {
+              "name": "Checkout /  Delivery Distance",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"deliveryAddress\": {\n\t\t\"addressLine1\": \"6114 reseda blvd\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Reseda\",\n\t\t\"postalCode\": \"91335\",\n\t\t\"country\": \"us\"\n\t}\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/delivery-distance?{{params}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "delivery-distance"
+                  ],
+                  "query": [
+                    {
+                      "key": "{{params}}",
+                      "value": ""
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  ""
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Calculate payment",
+          "item": [
+            {
+              "name": "Checkout / Calculate (PICKUP) ",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"deliveryAddress\": {\n\t\t\"country\": \"\",\n\t\t\"region\": \"\",\n\t\t\"addressLine1\": \"\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"\",\n\t\t\"postalCode\": \"\"\n\t},\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"959\",\n\t\t\t\"quantity\": \"1\",\n\t\t\t\"modifiers\": []\n\t\t\t\n\t\t}\n\t],\n\t\"deliveryType\": \"1\",\n\t\"obtainingTime\": \"Sunday, Feb 24 12:00 AM\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/calculate",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "calculate"
+                  ]
+                },
+                "description": "Calculate sale amount based on PICKUP delivery type."
+              },
+              "response": []
+            },
+            {
+              "name": "Checkout / Calculate (PICKUP + COUPONS)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"deliveryAddress\": {\n\t\t\"country\": \"\",\n\t\t\"region\": \"\",\n\t\t\"addressLine1\": \"\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"\",\n\t\t\"postalCode\": \"\"\n\t},\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"959\",\n\t\t\t\"quantity\": \"1\",\n\t\t\t\"modifiers\": []\n\t\t\t\n\t\t}\n\t],\n\t\"coupons\": [\"5c4f1cf92c9f0\"],\n\t\"deliveryType\": \"1\",\n\t\"obtainingTime\": \"Thursday, Dec 20 12:00 AM\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/calculate",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "calculate"
+                  ]
+                },
+                "description": "Calculate sale amount based on PICKUP delivery type with coupons."
+              },
+              "response": []
+            },
+            {
+              "name": "Checkout / Calculate (SHIP IT) ",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"deliveryAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\"\n\t},\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"959\",\n\t\t\t\"quantity\": \"1\",\n\t\t\t\"modifiers\": []\n\t\t\t\n\t\t}\n\t],\n\t\"deliveryType\": 2,\n\t\"serviceCode\": \"03\",\n\t\"carrierCode\": \"UPS\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/calculate",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "calculate"
+                  ]
+                },
+                "description": "Calculate sale amount based on SHIP IT delivery type.\nBefore send this request you must get all available rates using request Checkout / Delivery Rates. After that tou can choose any of them and set it to body params \"serviceCode\" and \"carrierCode\": \"UPS\"."
+              },
+              "response": []
+            },
+            {
+              "name": "Checkout / Calculate (LOCAL DELIVERY)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"deliveryAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\"\n\t},\n\t\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"959\",\n\t\t\t\"quantity\": \"1\",\n\t\t\t\"modifiers\": []\n\t\t\t\n\t\t}\n\t],\n\t\n\t\"deliveryType\": 5,\n\t\"obtainingTime\": \"Thursday, Dec 20 12:00 AM\",\n\t\"obtainingWarehouseId\": \"3\",\n\t\"localDeliveryDistance\": \"19.997718030966\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/calculate",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "calculate"
+                  ]
+                },
+                "description": "Calculate sale amount based on LOCAL DELIVERY delivery type. Make sure you get localDeliveryDistance and obtainingWarehouseId by using Checkout / Delivery Distance request."
+              },
+              "response": []
+            },
+            {
+              "name": "Checkout / Delivery Rates (SHIP IT)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"deliveryAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\"\n\t},\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"959\",\n\t\t\t\"quantity\": \"1\",\n\t\t\t\"modifiers\": []\n\t\t}\n\t]\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/delivery-rates",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "delivery-rates"
+                  ]
+                },
+                "description": "Get all available delivery rates for SHIP IT delivery type."
+              },
+              "response": []
+            },
+            {
+              "name": "Checkout / Delivery Distance (LOCAL DELIVERY)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"deliveryAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\"\n\t}\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/delivery-distance",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "delivery-distance"
+                  ]
+                },
+                "description": "Get local delivery distance."
+              },
+              "response": []
+            }
+          ],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  ""
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create payment",
+          "item": [
+            {
+              "name": "Checkout / Create Payment (PICKUP + CardOnFile)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"deliveryAddress\": {\n\t\t\"country\": \"\",\n\t\t\"region\": \"\",\n\t\t\"addressLine1\": \"\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"\",\n\t\t\"postalCode\": \"\"\n  },\n  \"billingAddress\": {\n    \"addressLine1\": \"249 Maple St\",\n    \"addressLine2\": \"\",\n    \"city\": \"Brooklyn\",\n    \"country\": \"us\",\n    \"postalCode\": \"11225\",\n    \"region\": \"NY\",\n    \"countryPhoneCode\": \"+1\",\n    \"phone\": \"55555555\",\n    \"firstName\": \"Test\",\n    \"lastName\": \"User\"\n  },\n  \"customerData\": {\n    \"countryPhoneCode\": \"+1\",\n    \"phone\": \"55555555\",\n    \"firstName\": \"Test\",\n    \"lastName\": \"User\",\n    \"email\": \"testuser@test.com\"\n  },\n  \n  \"products\": [\n    {\n      \"productId\": \"959\",\n      \"quantity\": \"1\",\n      \"modifiers\": []\n      \n    }\n  ],\n  \n  \"deliveryType\": 1,\n  \"obtainingDate\": \"Thursday, Dec 15, 2022\",\n  \"obtainingTime\": \"1:00 AM - 2:00 AM\",\n  \n  \"coupons\": [],\n  \n  \"creditCardAmount\": \"5.61\",\n  \"accountsReceivableAmount\": \"\",\n  \"storeCreditAmount\": \"\",\n  \n  \"giftCardAmount\": \"\",\n  \"giftCardNumber\": \"\",\n  \n  \"cardOnFileId\": \"34\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/payment-create",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "payment-create"
+                  ]
+                },
+                "description": "Create payment sample for PICKUP using Card on File id"
+              },
+              "response": []
+            },
+            {
+              "name": "Checkout / Create Payment (PICKUP + COUPONS)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"deliveryAddress\": {\n\t\t\"country\": \"\",\n\t\t\"region\": \"\",\n\t\t\"addressLine1\": \"\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"\",\n\t\t\"postalCode\": \"\"\n\t},\n\t\"billingAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\",\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"55555555\",\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\"\n\t},\n\t\"customerData\": {\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"55555555\",\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\",\n\t\t\"email\": \"testuser@test.com\"\n\t},\n\t\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"959\",\n\t\t\t\"quantity\": \"1\",\n\t\t\t\"modifiers\": []\n\t\t\t\n\t\t}\n\t],\n\t\n\t\"deliveryType\": 1,\n\t\"obtainingDate\": \"Thursday, Dec 15, 2022\",\n    \"obtainingTime\": \"1:00 AM - 2:00 AM\",\n\t\n\t\"coupons\": [\"5c4f1cf92c9f0\"],\n\t\n\t\"creditCardAmount\": \"5.61\",\n\t\"accountsReceivableAmount\": \"\",\n\t\"storeCreditAmount\": \"\",\n\t\n\t\"giftCardAmount\": \"\",\n\t\"giftCardNumber\": \"\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/payment-create",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "payment-create"
+                  ]
+                },
+                "description": "Create payment sample for PICKUP with using coupons"
+              },
+              "response": []
+            },
+            {
+              "name": "Checkout / Create Payment (SHIP IT) ",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"deliveryAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\",\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"55555555\",\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\"\n\t},\n\t\"billingAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\",\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"55555555\",\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\"\n\t},\n\t\"customerData\": {\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"55555555\",\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\",\n\t\t\"email\": \"testuser@test.com\"\n\t},\n\t\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"959\",\n\t\t\t\"quantity\": \"1\",\n\t\t\t\"modifiers\": []\n\t\t\t\n\t\t}\n\t],\n\t\n\t\"deliveryType\": 2,\n\t\"serviceCode\": \"03\",\n\t\"carrierCode\": \"UPS\",\n\t\n\t\"coupons\": [],\n\t\n\t\"creditCardAmount\": \"19.52\",\n\t\"accountsReceivableAmount\": \"\",\n\t\"storeCreditAmount\": \"\",\n\t\n\t\"giftCardAmount\": \"\",\n\t\"giftCardNumber\": \"\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/payment-create",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "payment-create"
+                  ]
+                },
+                "description": "Calculate with shipping"
+              },
+              "response": []
+            },
+            {
+              "name": "Checkout / Create Payment (LOCAL DELIVERY)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"deliveryAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\",\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"55555555\",\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\"\n\t},\n\t\"billingAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\",\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"55555555\",\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\"\n\t},\n\t\"customerData\": {\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"55555555\",\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\",\n\t\t\"email\": \"testuser@test.com\"\n\t},\n\t\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"959\",\n\t\t\t\"quantity\": \"1\",\n\t\t\t\"modifiers\": []\n\t\t\t\n\t\t}\n\t],\n\t\n\t\"deliveryType\": 5,\n    \"obtainingDate\": \"Thursday, Dec 15, 2022\",\n    \"obtainingTime\": \"1:00 AM - 2:00 AM\",\n\t\"obtainingWarehouseId\": \"3\",\n\t\"localDeliveryDistance\": \"19.997718030966\",\n\t\n\t\"coupons\": [],\n\t\n\t\"creditCardAmount\": \"31.12\",\n\t\"accountsReceivableAmount\": \"\",\n\t\"storeCreditAmount\": \"\",\n\t\n\t\"giftCardAmount\": \"\",\n\t\"giftCardNumber\": \"\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/payment-create",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "payment-create"
+                  ]
+                },
+                "description": "Create payment with LOCAL DELIVERY TYPE"
+              },
+              "response": []
+            },
+            {
+              "name": "Checkout / Create Payment (GIFTCARD PRODUCT)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"customerData\": {\n\t\t\"firstName\": \"Anonymous\",\n\t\t\"assigneeEmail\": \"anonymouse@test.biz\",\n\t\t\"assigneeCountryPhoneCode\": \"1\",\n\t\t\"assigneePhone\": \"5555555\",\n\t\t\"message\": \"Hi There!\"\n\t},\n\t\n\t\"products\": [\n\t\t{\n\t\t\t\"productId\": \"45\",\n\t\t\t\"quantity\": \"1\",\n\t\t\t\"redefinedPrice\": \"100.00\"\n\t\t}\n\t],\n\n\t\"deliveryType\": 1,\n    \"obtainingDate\": \"Thursday, Dec 15, 2022\",\n    \"obtainingTime\": \"1:00 AM - 2:00 AM\",\n\t\n\t\"creditCardAmount\": \"100.00\",\n\t\"accountsReceivableAmount\": \"\",\n\t\"storeCreditAmount\": \"\"\n}\n"
+                },
+                "url": {
+                  "raw": "{{url}}/checkout/payment-create",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "checkout",
+                    "payment-create"
+                  ]
+                },
+                "description": "Create payment for product with type giftCard."
+              },
+              "response": []
+            }
+          ],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  ""
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Complete Payment",
+          "item": [
+            {
+              "name": "ELEMENT",
+              "item": [
+                {
+                  "name": "Checkout / Complete Payment (ELEMENT APPROVED) ",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{jwt}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"transaction\": \"12918\",\n\t\"electronicPayment\": \"1\",\n\t\"method\": \"1\",\n\n\t\"paymentId\": \"7D973C93-3A31-4F49-BDA9-FC04AF2220E2\",\n\t\"electronicTransactionId\": \"8699563\",\n\t\"returnCode\": \"Complete\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{url}}/checkout/payment-complete",
+                      "host": [
+                        "{{url}}"
+                      ],
+                      "path": [
+                        "checkout",
+                        "payment-complete"
+                      ]
+                    },
+                    "description": "Complete Payment with ELEMENT payment provider."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Checkout / Complete Payment (ELEMENT CANCELLED)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{jwt}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"transaction\": \"12349\",\n\t\"electronicPayment\": \"1\",\n\t\"method\": \"1\",\n\n\t\"paymentId\": \"B588599A-5E25-4C58-818A-BD138385A717\",\n\t\"electronicTransactionId\": \"\",\n\t\"returnCode\": \"Cancelled\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{url}}/checkout/payment-complete",
+                      "host": [
+                        "{{url}}"
+                      ],
+                      "path": [
+                        "checkout",
+                        "payment-complete"
+                      ]
+                    },
+                    "description": "Cancel Payment with ELEMENT payment provider."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Checkout / Complete Payment (ELEMENT CardOnFile) ",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{jwt}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"transaction\": \"12632\",\n  \"electronicPayment\": \"1\",\n  \"method\": \"1\",\n  \"cardOnFileId\": \"34\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{url}}/checkout/payment-complete",
+                      "host": [
+                        "{{url}}"
+                      ],
+                      "path": [
+                        "checkout",
+                        "payment-complete"
+                      ]
+                    },
+                    "description": "Complete Payment with ELEMENT payment provider with using Card On File."
+                  },
+                  "response": []
+                }
+              ],
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      ""
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "PAYPAL",
+              "item": [
+                {
+                  "name": "Checkout / Complete Payment (PAYPAL APPROVED) ",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{jwt}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"transaction\": \"12350\",\n\t\"electronicPayment\": \"1\",\n\t\"method\": \"2\",\n\n\t\"paymentId\": \"PAY-1DP99296W1093382BLQ26HLI\",\n\t\"token\": \"EC-1CW94240HF115044B\",\n\t\"payerId\": \"9SBJHYPT24A22\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{url}}/checkout/payment-complete",
+                      "host": [
+                        "{{url}}"
+                      ],
+                      "path": [
+                        "checkout",
+                        "payment-complete"
+                      ]
+                    },
+                    "description": "Complete Payment with PAYPAL payment provider."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Checkout / Complete Payment (PAYPAL CANCELLED) ",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{jwt}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"transaction\": \"12351\",\n\t\"electronicPayment\": \"1\",\n\t\"method\": \"2\",\n\n\t\"paymentId\": \"\",\n\t\"token\": \"EC-1CW94240HF115044B\",\n\t\"payerId\": \"\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{url}}/checkout/payment-complete",
+                      "host": [
+                        "{{url}}"
+                      ],
+                      "path": [
+                        "checkout",
+                        "payment-complete"
+                      ]
+                    },
+                    "description": "Cancel Payment with PAYPAL payment provider."
+                  },
+                  "response": []
+                }
+              ],
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      ""
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      ""
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "HOSTED CHECKOUT",
+              "item": [
+                {
+                  "name": "Checkout / Complete Payment (HC APPROVED) ",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{jwt}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"transaction\": \"12357\",\n\t\"electronicPayment\": \"1\",\n\t\"method\": \"5\",\n\n\t\"paymentId\": \"aa574c49-8815-493a-b0f3-c7bd17255cf4\",\n\t\"returnCode\": \"0\",\n\t\"token\": \"\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{url}}/checkout/payment-complete",
+                      "host": [
+                        "{{url}}"
+                      ],
+                      "path": [
+                        "checkout",
+                        "payment-complete"
+                      ]
+                    },
+                    "description": "Complete Payment with HOSTED CHECKOUT payment provider."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Checkout / Complete Payment (HC CANCELLED)  ",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{jwt}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"transaction\": \"12355\",\n\t\"electronicPayment\": \"1\",\n\t\"method\": \"5\",\n\n\t\"paymentId\": \"5deb737c-d042-42ed-9387-0a3b0ff41ae1\",\n\t\"returnCode\": \"102\",\n\t\"token\": \"\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{url}}/checkout/payment-complete",
+                      "host": [
+                        "{{url}}"
+                      ],
+                      "path": [
+                        "checkout",
+                        "payment-complete"
+                      ]
+                    },
+                    "description": "Cancel Payment with HOSTED CHECKOUT payment provider."
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "OPENEDGE",
+              "item": [
+                {
+                  "name": "Checkout / Complete Payment (OPENEDGE APPROVED)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{jwt}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"transaction\": \"12358\",\n\t\"electronicPayment\": \"1\",\n\t\"method\": \"6\",\n\n\t\"paymentId\": \"a4967bc1c4674a6f63b6\",\n\t\"returnCode\": \"1\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{url}}/checkout/payment-complete",
+                      "host": [
+                        "{{url}}"
+                      ],
+                      "path": [
+                        "checkout",
+                        "payment-complete"
+                      ]
+                    },
+                    "description": "Complete Payment with OPEN EDGE payment provider."
+                  },
+                  "response": []
+                },
+                {
+                  "name": "Checkout / Complete Payment (OPENEDGE CANCELLED)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{jwt}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"transaction\": \"12361\",\n\t\"electronicPayment\": \"1\",\n\t\"method\": \"6\",\n\n\t\"paymentId\": \"a23f1cf20d54b5569f34\",\n\t\"returnCode\": \"4\"\n\t\n}"
+                    },
+                    "url": {
+                      "raw": "{{url}}/checkout/payment-complete",
+                      "host": [
+                        "{{url}}"
+                      ],
+                      "path": [
+                        "checkout",
+                        "payment-complete"
+                      ]
+                    },
+                    "description": "Cancel Payment with OPENEDGE payment provider."
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "NO ELECTRONIC PROVIDER",
+              "item": [
+                {
+                  "name": "Checkout / Complete Payment (NO ELECTRONIC PAYMENT)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{jwt}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n\t\"transaction\": \"12361\",\n\t\"electronicPayment\": \"0\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{url}}/checkout/payment-complete",
+                      "host": [
+                        "{{url}}"
+                      ],
+                      "path": [
+                        "checkout",
+                        "payment-complete"
+                      ]
+                    },
+                    "description": "Sample for complete payment, without electonic payment. It means that user can pay either store credit amount or account receivable amount."
+                  },
+                  "response": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Customer",
+      "item": [
+        {
+          "name": "Customer / View",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/customer/view",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "view"
+              ]
+            },
+            "description": "Get customer details."
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Points Settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{url}}/customer/points-settings?{{params}}=",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "points-settings"
+              ],
+              "query": [
+                {
+                  "key": "{{params}}",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Get Customer Points Settings for converting points into Store Credit."
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Purchases List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"dateFrom\": \"12/01/2018\",\n\t\"dateTo\": \"12/31/2018\",\n\t\"offset\": 0,\n\t\"limit\": 100\n}"
+            },
+            "url": {
+              "raw": "{{url}}/customer/purchases-list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "purchases-list"
+              ]
+            },
+            "description": "Get List of current customer purchases.\n\ndate format must be 'MM/dd/YYYY'\nMM   - Month digit 01 to 12, zero leading\nDD   - Day of month 01 to 31, zero leading\nYYYY - 4 year digit, e.g., 2005"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Download Receipt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"saleTransactionId\": \"12804\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/customer/download-receipt",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "download-receipt"
+              ]
+            },
+            "description": "Return receipt file content"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Upload Avatar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "disabled": true
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "avatar",
+                  "value": null,
+                  "type": "file"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{url}}/customer/upload-avatar",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "upload-avatar"
+              ]
+            },
+            "description": "Upload image file for customer avatar.\nAvailable types are: jpg, jpeg, png"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Remove Avatar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "type": "text",
+                "value": "application/x-www-form-urlencoded"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/customer/remove-avatar",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "remove-avatar"
+              ]
+            },
+            "description": "Remove avatar of customer."
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Update ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"firstName\": \"Test\",\n\t\"lastName\": \"User\",\n\t\"countryPhoneCode\": \"+1\",\n\t\"phone\": \"661695\",\n\t\"email\": \"testuser@test.com\",\n\t\"birthdayMonth\": \"3\",\n\t\"mailingList\": \"0\",\n\t\"receiptAction\": 1,\n\t\"touchAction\": 2,\n\t\"billingAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\"\n\t},\n\t\"deliveryAddress\": {\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\",\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\",\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"661695\"\n\t},\n\t\"password\": \"123456789\",\n\t\"newPassword\": \"123456789\",\n\t\"repeatNewPassword\": \"123456789\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/customer/update",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "update"
+              ]
+            },
+            "description": "Update customer"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Update Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\" : \"YnFM8zlw\",\n  \"newPassword\" : \"123456\",\n  \"repeatNewPassword\" : \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/customer/update-password",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "update-password"
+              ]
+            },
+            "description": "Update contact/customer password"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Set Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\" : \"123456\",\n  \"repeatPassword\" : \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/customer/set-password",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "set-password"
+              ]
+            },
+            "description": "Set password for customer"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Quotes List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/customer/quotes-list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "quotes-list"
+              ]
+            },
+            "description": "List of customer quotes"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Rewards",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dateFrom\": \"12/01/2018\",\n  \"dateTo\": \"12/31/2018\",\n  \"type\": 2,\n  \"offset\": 0,\n  \"limit\": 10\n}"
+            },
+            "url": {
+              "raw": "{{url}}/customer/rewards",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "customer",
+                "rewards"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete customer test",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": ""
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Custom Attribute",
+      "item": [
+        {
+          "name": "Custom Attribute / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/custom-attribute/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "custom-attribute",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Gift Card",
+      "item": [
+        {
+          "name": "Gift Card / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"offset\": \"0\", \n\t\"limit\": \"10\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/gift-card/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "gift-card",
+                "list"
+              ]
+            },
+            "description": "Get list of gift cards"
+          },
+          "response": []
+        },
+        {
+          "name": "Gift Card / Download",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"giftCardId\": \"31\", \n\t\"token\": \"78dw7domcxpbpbtapbeerynv\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/gift-card/download",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "gift-card",
+                "download"
+              ]
+            },
+            "description": "Download gift card"
+          },
+          "response": []
+        },
+        {
+          "name": "Gift Card / Get Gift Card Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/gift-card/get-product",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "gift-card",
+                "get-product"
+              ]
+            },
+            "description": "Get lproduct with type gift card"
+          },
+          "response": []
+        },
+        {
+          "name": "Gift Card / View",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"barcode\": \"5c45f9a10188e\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/gift-card/view",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "gift-card",
+                "view"
+              ]
+            },
+            "description": "Get gift card by barcode"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Measure Unit",
+      "item": [
+        {
+          "name": "Measure Unit / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/measure-unit/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "measure-unit",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Measure Unit Group /List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/measure-unit-group/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "measure-unit-group",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Measure Unit Base / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/measure-unit-base/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "measure-unit-base",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Menu",
+      "item": [
+        {
+          "name": "Menu / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/menu/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "menu",
+                "list"
+              ]
+            },
+            "description": "Get the list of menu items."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Modifier ",
+      "item": [
+        {
+          "name": "Modifier / List ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/modifier/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "modifier",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Modifier Group",
+      "item": [
+        {
+          "name": "Modifier Group / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/modifier-group/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "modifier-group",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Page",
+      "item": [
+        {
+          "name": "Page / View",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"id\": 72\n}"
+            },
+            "url": {
+              "raw": "{{url}}/page/view",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "page",
+                "view"
+              ]
+            },
+            "description": "Get custom page by id."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "item": [
+        {
+          "name": "Product / View",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"productId\": \"1411\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/product/view",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "product",
+                "view"
+              ]
+            },
+            "description": "View product"
+          },
+          "response": []
+        },
+        {
+          "name": "Product / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"2\",\n  \"brandIds\": [\"1\"],\n  \"priceFrom\" : \"0.01\",\n  \"priceTo\": \"20.00\",\n  \"customAttributes\": [\n  \t{\n  \t\t\"id\": \"1\",\n  \t\t\"value\": \"2015\"\n  \t},\n  \t{\n  \t\t\"id\": \"1\",\n  \t\t\"value\": \"2016\"\n  \t}\n  ],\n  \"offset\": \"0\",\n  \"limit\": \"20\",\n  \"sort\": \"title\",\n  \"order\": \"asc\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/product/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "product",
+                "list"
+              ]
+            },
+            "description": "Get the list of products."
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"q\": \"am\",\n  \"offset\": \"0\",\n  \"limit\": \"20\",\n  \"sort\": \"title\",\n  \"order\": \"asc\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/product/search",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "product",
+                "search"
+              ]
+            },
+            "description": "Search product by title"
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Favorites",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/product/favorites",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "product",
+                "favorites"
+              ]
+            },
+            "description": "Get the list of favorite products."
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Archive",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/product/archive",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "product",
+                "archive"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Raw",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/product/raw",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "product",
+                "raw"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Purchase Order",
+      "item": [
+        {
+          "name": "Purchase Order / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"stockLocationId\": \"2\",\r\n  \"limit\": \"100\",\r\n  \"offset\": \"0\",\r\n  \"order\": \"asc\",\r\n  \"status\": \"1\"\r\n}"
+            },
+            "url": {
+              "raw": "{{url}}/purchase-order/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "purchase-order",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Report",
+      "item": [
+        {
+          "name": "Report / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"limit\": \"100\",\r\n  \"offset\": \"0\",\r\n  \"order\": \"asc\"\r\n}"
+            },
+            "url": {
+              "raw": "{{url}}/report/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "report",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sale",
+      "item": [
+        {
+          "name": "Sales / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"limit\": \"100\",\r\n  \"offset\": \"0\",\r\n  \"employeeId\": \"29\",\r\n  \"customerId\": \"492\",\r\n  \"id\": 13215,\r\n  \"timeFrom\": \"1552870800\",\r\n  \"timeTo\": \" 1553526000\",\r\n  \"status\": \"1\",\r\n  \"order\": \"asc\"\r\n}"
+            },
+            "url": {
+              "raw": "{{url}}/sale/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "sale",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sales Outlet",
+      "item": [
+        {
+          "name": "Sales Outlet / Config ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/sales-outlet/config",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "sales-outlet",
+                "config"
+              ]
+            },
+            "description": "View config by sales outlet"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Vendor",
+      "item": [
+        {
+          "name": "Vendor / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/vendor/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "vendor",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tax",
+      "item": [
+        {
+          "name": "Tax / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/tax/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "tax",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ]
+}

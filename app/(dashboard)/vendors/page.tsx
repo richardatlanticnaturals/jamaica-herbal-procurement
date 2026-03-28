@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Mail, Globe, Phone, Truck } from "lucide-react";
+import Link from "next/link";
 
 const orderMethodIcons: Record<string, typeof Mail> = {
   EMAIL: Mail,
@@ -222,7 +223,8 @@ export default function VendorsPage() {
           {filtered.map((vendor) => {
             const Icon = orderMethodIcons[vendor.orderMethod] || Mail;
             return (
-              <Card key={vendor.id} className="hover:shadow-md transition-shadow">
+              <Link key={vendor.id} href={`/vendors/${vendor.id}`}>
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">{vendor.name}</CardTitle>
@@ -254,6 +256,7 @@ export default function VendorsPage() {
                   </div>
                 </CardContent>
               </Card>
+              </Link>
             );
           })}
         </div>

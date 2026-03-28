@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
+import { syncAllInventory } from "@/lib/shopify";
 
 interface ConfirmLineItem {
   receivingLineItemId: string;
@@ -207,6 +208,54 @@ export async function POST(
 
       return { receiving: updatedReceiving, newPoStatus };
     });
+
+    // Push updated stock levels to Shopify (non-blocking — log errors but don't fail the receiving)
+    try {
+      // Collect SKUs and their new stock levels from the confirmed items
+      const inventoryItemIds = lineItems
+        .map((li) => {
+          const recLine = receiving.lineItems.find(
+            (rl) => rl.id === li.receivingLineItemId
+          );
+          return recLine?.inventoryItemId;
+        })
+        .filter((id): id is string => !!id);
+
+      if (inventoryItemIds.length > 0) {
+        // Fetch the current stock for each updated inventory item
+        const updatedItems = await prisma.inventoryItem.findMany({
+          where: { id: { in: inventoryItemIds } },
+          select: { sku: true, currentStock: true },
+        });
+
+        const syncPayload = updatedItems.map((item) => ({
+          sku: item.sku,
+          qty: item.currentStock,
+        }));
+
+        // Fire and forget — don't await so we don't block the response
+        syncAllInventory(syncPayload)
+          .then((results) => {
+            const failed = results.filter((r) => !r.success);
+            if (failed.length > 0) {
+              console.warn(
+                "Shopify sync: some items failed:",
+                failed.map((f) => `${f.sku}: ${f.error}`)
+              );
+            } else {
+              console.log(
+                `Shopify sync: ${results.length} items synced successfully`
+              );
+            }
+          })
+          .catch((err) => {
+            console.error("Shopify inventory sync error:", err);
+          });
+      }
+    } catch (shopifyErr) {
+      // Never fail the receiving because of a Shopify sync issue
+      console.error("Shopify sync setup error:", shopifyErr);
+    }
 
     return NextResponse.json(result);
   } catch (error) {

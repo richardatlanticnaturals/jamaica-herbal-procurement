@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -13,7 +14,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, Search, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Upload, Search, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 
 export default function InventoryPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -25,6 +41,20 @@ export default function InventoryPage() {
   const [uploading, setUploading] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Edit dialog state
+  const [editItem, setEditItem] = useState<any | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [vendors, setVendors] = useState<any[]>([]);
+
+  // Edit form fields
+  const [editReorderPoint, setEditReorderPoint] = useState(0);
+  const [editReorderQty, setEditReorderQty] = useState(0);
+  const [editCostPrice, setEditCostPrice] = useState("");
+  const [editRetailPrice, setEditRetailPrice] = useState("");
+  const [editVendorId, setEditVendorId] = useState("");
+  const [editIsActive, setEditIsActive] = useState(true);
 
   const loadItems = useCallback(async (p: number, s: string) => {
     setLoading(true);
@@ -43,9 +73,24 @@ export default function InventoryPage() {
     }
   }, []);
 
+  // Load vendors once for the dropdown
+  const loadVendors = useCallback(async () => {
+    try {
+      const res = await fetch("/api/vendors");
+      const data = await res.json();
+      setVendors(data.vendors || []);
+    } catch (err) {
+      console.error("Failed to load vendors:", err);
+    }
+  }, []);
+
   useEffect(() => {
     loadItems(page, search);
   }, [page, search, loadItems]);
+
+  useEffect(() => {
+    loadVendors();
+  }, [loadVendors]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,6 +133,51 @@ export default function InventoryPage() {
     if (current <= 0) return <Badge variant="destructive">Out of Stock</Badge>;
     if (current <= reorderPoint) return <Badge className="bg-orange-500 text-white">Low Stock</Badge>;
     return <Badge className="bg-green-600 text-white">In Stock</Badge>;
+  };
+
+  // Open edit dialog and populate form fields from item
+  const openEditDialog = (item: any) => {
+    setEditItem(item);
+    setEditReorderPoint(item.reorderPoint);
+    setEditReorderQty(item.reorderQty);
+    setEditCostPrice(Number(item.costPrice).toFixed(2));
+    setEditRetailPrice(Number(item.retailPrice).toFixed(2));
+    setEditVendorId(item.vendorId || "none");
+    setEditIsActive(item.isActive);
+    setEditOpen(true);
+  };
+
+  // Save edited item via PUT /api/inventory/[id]
+  const handleSaveEdit = async () => {
+    if (!editItem) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/inventory/${editItem.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reorderPoint: editReorderPoint,
+          reorderQty: editReorderQty,
+          costPrice: parseFloat(editCostPrice),
+          retailPrice: parseFloat(editRetailPrice),
+          vendorId: editVendorId === "none" ? null : editVendorId,
+          isActive: editIsActive,
+        }),
+      });
+      if (res.ok) {
+        setEditOpen(false);
+        setEditItem(null);
+        // Refresh data
+        loadItems(page, search);
+      } else {
+        const data = await res.json();
+        console.error("Save failed:", data.error);
+      }
+    } catch (err) {
+      console.error("Failed to save item:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -176,17 +266,22 @@ export default function InventoryPage() {
                     <TableHead className="text-center">Stock</TableHead>
                     <TableHead className="text-center">Reorder Pt</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {items.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => openEditDialog(item)}
+                    >
                       <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                       <TableCell className="font-medium max-w-[200px] truncate">
                         {item.name}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {item.category || "—"}
+                        {item.category || "\u2014"}
                       </TableCell>
                       <TableCell className="text-right">
                         ${Number(item.costPrice).toFixed(2)}
@@ -200,6 +295,9 @@ export default function InventoryPage() {
                       <TableCell className="text-center">{item.reorderPoint}</TableCell>
                       <TableCell>
                         {getStockBadge(item.currentStock, item.reorderPoint)}
+                      </TableCell>
+                      <TableCell>
+                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -238,6 +336,112 @@ export default function InventoryPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Item Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Inventory Item</DialogTitle>
+            <DialogDescription>
+              {editItem?.name} ({editItem?.sku})
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-reorderPoint">Reorder Point</Label>
+                <Input
+                  id="edit-reorderPoint"
+                  type="number"
+                  min={0}
+                  value={editReorderPoint}
+                  onChange={(e) => setEditReorderPoint(Number(e.target.value))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-reorderQty">Reorder Qty</Label>
+                <Input
+                  id="edit-reorderQty"
+                  type="number"
+                  min={0}
+                  value={editReorderQty}
+                  onChange={(e) => setEditReorderQty(Number(e.target.value))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-costPrice">Cost Price ($)</Label>
+                <Input
+                  id="edit-costPrice"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={editCostPrice}
+                  onChange={(e) => setEditCostPrice(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-retailPrice">Retail Price ($)</Label>
+                <Input
+                  id="edit-retailPrice"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={editRetailPrice}
+                  onChange={(e) => setEditRetailPrice(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Vendor</Label>
+              <Select value={editVendorId} onValueChange={(v) => setEditVendorId(v || "none")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select vendor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No vendor</SelectItem>
+                  {vendors.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-3">
+              <Label htmlFor="edit-isActive" className="cursor-pointer">Active</Label>
+              <button
+                id="edit-isActive"
+                type="button"
+                role="switch"
+                aria-checked={editIsActive}
+                onClick={() => setEditIsActive(!editIsActive)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors ${
+                  editIsActive ? "bg-primary" : "bg-muted"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                    editIsActive ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+              <span className="text-sm text-muted-foreground">
+                {editIsActive ? "Active" : "Inactive"}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={saving} onClick={handleSaveEdit}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
