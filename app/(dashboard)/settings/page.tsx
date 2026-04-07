@@ -24,6 +24,8 @@ import {
   Save,
   Sparkles,
   Package,
+  Upload,
+  ArrowDownToLine,
 } from "lucide-react";
 
 interface AppSettings {
@@ -38,21 +40,33 @@ interface AppSettings {
   syncIntervalMinutes: number;
   lastInventorySync: string | null;
   lastVendorSync: string | null;
+  lastProductSync: string | null;
   comcashApiKeySet: boolean;
   anthropicApiKeySet: boolean;
   comcashApiUrl: string | null;
+}
+
+interface SyncResult {
+  success: boolean;
+  message: string;
 }
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{
-    success: boolean;
-    message: string;
-  } | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  // Comcash sync states
+  const [syncingVendors, setSyncingVendors] = useState(false);
+  const [syncingProducts, setSyncingProducts] = useState(false);
+  const [pushingInventory, setPushingInventory] = useState(false);
+  const [vendorSyncResult, setVendorSyncResult] = useState<SyncResult | null>(
+    null
+  );
+  const [productSyncResult, setProductSyncResult] =
+    useState<SyncResult | null>(null);
+  const [pushResult, setPushResult] = useState<SyncResult | null>(null);
 
   // Editable fields
   const [poPrefix, setPoPrefix] = useState("PO");
@@ -109,32 +123,115 @@ export default function SettingsPage() {
     }
   };
 
+  // --- Comcash Sync Handlers ---
+
   const handleSyncVendors = async () => {
-    setSyncing(true);
-    setSyncResult(null);
+    setSyncingVendors(true);
+    setVendorSyncResult(null);
     try {
       const res = await fetch("/api/comcash/sync-vendors", { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        setSyncResult({
+        setVendorSyncResult({
           success: true,
-          message: `Synced ${data.synced} vendors (${data.created} new, ${data.updated} updated, ${data.skipped} skipped)`,
+          message: `Synced ${data.synced || data.total || 0} vendors (${data.created} new, ${data.updated} updated, ${data.skipped} skipped)`,
         });
         await loadSettings();
       } else {
-        setSyncResult({
+        setVendorSyncResult({
           success: false,
-          message: data.error || "Sync failed",
+          message: data.error || "Vendor sync failed",
         });
       }
     } catch (err) {
-      setSyncResult({
+      setVendorSyncResult({
         success: false,
-        message: err instanceof Error ? err.message : "Sync failed",
+        message: err instanceof Error ? err.message : "Vendor sync failed",
       });
     } finally {
-      setSyncing(false);
+      setSyncingVendors(false);
     }
+  };
+
+  const handleSyncProducts = async () => {
+    setSyncingProducts(true);
+    setProductSyncResult(null);
+    try {
+      const res = await fetch("/api/comcash/sync-products", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setProductSyncResult({
+          success: true,
+          message: data.message || `Synced ${data.total} products`,
+        });
+        await loadSettings();
+      } else {
+        setProductSyncResult({
+          success: false,
+          message: data.error || "Product sync failed",
+        });
+      }
+    } catch (err) {
+      setProductSyncResult({
+        success: false,
+        message: err instanceof Error ? err.message : "Product sync failed",
+      });
+    } finally {
+      setSyncingProducts(false);
+    }
+  };
+
+  const handlePushInventory = async () => {
+    setPushingInventory(true);
+    setPushResult(null);
+    try {
+      const res = await fetch("/api/comcash/push-inventory", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPushResult({
+          success: true,
+          message:
+            data.message ||
+            `Pushed ${data.updated} items to Comcash`,
+        });
+        await loadSettings();
+      } else {
+        setPushResult({
+          success: false,
+          message: data.error || "Push failed",
+        });
+      }
+    } catch (err) {
+      setPushResult({
+        success: false,
+        message: err instanceof Error ? err.message : "Push failed",
+      });
+    } finally {
+      setPushingInventory(false);
+    }
+  };
+
+  // Helper to render sync result alerts
+  const renderSyncAlert = (result: SyncResult | null) => {
+    if (!result) return null;
+    return (
+      <div
+        className={`rounded-md p-3 text-sm ${
+          result.success
+            ? "bg-green-50 text-green-700 border border-green-200"
+            : "bg-red-50 text-red-700 border border-red-200"
+        }`}
+      >
+        {result.success ? (
+          <CheckCircle className="inline-block h-4 w-4 mr-2" />
+        ) : (
+          <XCircle className="inline-block h-4 w-4 mr-2" />
+        )}
+        {result.message}
+      </div>
+    );
   };
 
   if (loading) {
@@ -155,7 +252,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid gap-6">
-        {/* ─── Comcash POS ────────────────────────────────────────────── */}
+        {/* --- Comcash POS Integration --- */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -163,14 +260,16 @@ export default function SettingsPage() {
               <CardTitle>Comcash POS</CardTitle>
             </div>
             <CardDescription>
-              Sync vendors and inventory from your Comcash POS system
+              Sync vendors, products, and inventory with your Comcash POS system
+              via the Employee API
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
+            {/* Connection Status */}
             <div className="flex items-center gap-4">
               <div className="flex-1 space-y-1">
                 <Label className="text-xs text-muted-foreground">
-                  API Connection
+                  Employee API Connection
                 </Label>
                 <div className="flex items-center gap-2">
                   {settings?.comcashApiKeySet ? (
@@ -197,6 +296,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* Sync Vendors */}
             <div className="flex items-center gap-4">
               <div className="flex-1 space-y-1">
                 <Label className="text-xs text-muted-foreground">
@@ -210,10 +310,11 @@ export default function SettingsPage() {
               </div>
               <Button
                 onClick={handleSyncVendors}
-                disabled={syncing || !settings?.comcashApiKeySet}
+                disabled={syncingVendors || !settings?.comcashApiKeySet}
                 size="sm"
+                variant="outline"
               >
-                {syncing ? (
+                {syncingVendors ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Syncing...
@@ -226,40 +327,77 @@ export default function SettingsPage() {
                 )}
               </Button>
             </div>
+            {renderSyncAlert(vendorSyncResult)}
 
-            {syncResult && (
-              <div
-                className={`rounded-md p-3 text-sm ${
-                  syncResult.success
-                    ? "bg-green-50 text-green-700 border border-green-200"
-                    : "bg-red-50 text-red-700 border border-red-200"
-                }`}
-              >
-                {syncResult.success ? (
-                  <CheckCircle className="inline-block h-4 w-4 mr-2" />
-                ) : (
-                  <XCircle className="inline-block h-4 w-4 mr-2" />
-                )}
-                {syncResult.message}
-              </div>
-            )}
-
+            {/* Sync Products */}
             <div className="flex items-center gap-4">
               <div className="flex-1 space-y-1">
                 <Label className="text-xs text-muted-foreground">
-                  Last Inventory Sync
+                  Last Product Sync
+                </Label>
+                <p className="text-sm">
+                  {settings?.lastProductSync
+                    ? new Date(settings.lastProductSync).toLocaleString()
+                    : "Never synced"}
+                </p>
+              </div>
+              <Button
+                onClick={handleSyncProducts}
+                disabled={syncingProducts || !settings?.comcashApiKeySet}
+                size="sm"
+                variant="outline"
+              >
+                {syncingProducts ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownToLine className="mr-2 h-4 w-4" />
+                    Sync Products
+                  </>
+                )}
+              </Button>
+            </div>
+            {renderSyncAlert(productSyncResult)}
+
+            {/* Push Inventory */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Last Inventory Push
                 </Label>
                 <p className="text-sm">
                   {settings?.lastInventorySync
                     ? new Date(settings.lastInventorySync).toLocaleString()
-                    : "Never synced"}
+                    : "Never pushed"}
                 </p>
               </div>
+              <Button
+                onClick={handlePushInventory}
+                disabled={pushingInventory || !settings?.comcashApiKeySet}
+                size="sm"
+                variant="outline"
+              >
+                {pushingInventory ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Pushing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Push Inventory
+                  </>
+                )}
+              </Button>
             </div>
+            {renderSyncAlert(pushResult)}
           </CardContent>
         </Card>
 
-        {/* ─── PO Settings ────────────────────────────────────────────── */}
+        {/* --- PO Settings --- */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -302,7 +440,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* ─── Reorder Settings ───────────────────────────────────────── */}
+        {/* --- Reorder Settings --- */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -372,7 +510,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* ─── API Keys ───────────────────────────────────────────────── */}
+        {/* --- API Keys --- */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -408,7 +546,7 @@ export default function SettingsPage() {
               <div>
                 <p className="text-sm font-medium">Comcash POS</p>
                 <p className="text-xs text-muted-foreground">
-                  Vendor and inventory sync
+                  Employee API - vendor, product, and inventory sync
                 </p>
               </div>
               {settings?.comcashApiKeySet ? (

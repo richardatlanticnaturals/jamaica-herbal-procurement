@@ -15,9 +15,10 @@ export async function GET() {
 
     return NextResponse.json({
       ...settings,
-      comcashApiKeySet: !!process.env.COMCASH_API_KEY,
+      // Employee API uses OPENAPI_KEY + PIN + PASSWORD
+      comcashApiKeySet: !!process.env.COMCASH_OPENAPI_KEY,
       anthropicApiKeySet: !!process.env.ANTHROPIC_API_KEY,
-      comcashApiUrl: process.env.COMCASH_API_URL || null,
+      comcashApiUrl: process.env.COMCASH_OPENAPI_URL || null,
     });
   } catch (error) {
     console.error("Failed to fetch settings:", error);

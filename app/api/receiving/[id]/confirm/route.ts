@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { syncAllInventory } from "@/lib/shopify";
+import { updateInventory } from "@/lib/comcash";
 
 interface ConfirmLineItem {
   receivingLineItemId: string;
@@ -255,6 +256,58 @@ export async function POST(
     } catch (shopifyErr) {
       // Never fail the receiving because of a Shopify sync issue
       console.error("Shopify sync setup error:", shopifyErr);
+    }
+
+    // Push updated stock levels to Comcash POS (non-blocking — log errors but don't fail the receiving)
+    try {
+      const comcashItemIds = lineItems
+        .map((li) => {
+          const recLine = receiving.lineItems.find(
+            (rl) => rl.id === li.receivingLineItemId
+          );
+          return recLine?.inventoryItemId;
+        })
+        .filter((iid): iid is string => !!iid);
+
+      if (comcashItemIds.length > 0) {
+        // Fetch items that have a comcashItemId (linked to Comcash POS)
+        const comcashItems = await prisma.inventoryItem.findMany({
+          where: {
+            id: { in: comcashItemIds },
+            comcashItemId: { not: null },
+          },
+          select: { comcashItemId: true, currentStock: true },
+        });
+
+        if (comcashItems.length > 0) {
+          const comcashPayload = comcashItems.map((item) => ({
+            productId: parseInt(item.comcashItemId!, 10),
+            warehouseId: 1,
+            quantity: item.currentStock,
+          }));
+
+          // Fire and forget — don't await so we don't block the response
+          updateInventory(comcashPayload)
+            .then((comcashResult) => {
+              if (comcashResult.errors.length > 0) {
+                console.warn(
+                  "Comcash sync: some items failed:",
+                  comcashResult.errors
+                );
+              } else {
+                console.log(
+                  `Comcash sync: ${comcashResult.updated} items pushed successfully`
+                );
+              }
+            })
+            .catch((err) => {
+              console.error("Comcash inventory push error:", err);
+            });
+        }
+      }
+    } catch (comcashErr) {
+      // Never fail the receiving because of a Comcash sync issue
+      console.error("Comcash sync setup error:", comcashErr);
     }
 
     return NextResponse.json(result);
