@@ -211,7 +211,10 @@ export function matchDeliveryToPO(
 
   for (const { ocrIdx, poIdx, confidence } of scores) {
     if (assignedOcr.has(ocrIdx) || assignedPo.has(poIdx)) continue;
-    if (confidence < 0.2) continue; // Skip truly terrible matches
+    // Only assign matches that will actually be used in output (>= 0.5).
+    // Lower matches would consume a PO line item slot but get discarded
+    // as UNMATCHED, potentially blocking a better match for that PO line.
+    if (confidence < 0.5) continue;
 
     assignedOcr.add(ocrIdx);
     assignedPo.add(poIdx);

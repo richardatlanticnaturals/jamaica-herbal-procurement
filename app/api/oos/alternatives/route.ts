@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/api-auth";
 
 interface ClaudeMessage {
   role: "user" | "assistant";
@@ -21,6 +22,9 @@ interface SuggestedAlternative {
  * Accepts { inventoryItemId } and uses Claude to suggest alternative products.
  */
 export async function POST(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { inventoryItemId } = body;

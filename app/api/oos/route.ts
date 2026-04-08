@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/api-auth";
 
 /**
  * GET /api/oos
@@ -7,6 +8,9 @@ import { prisma } from "@/lib/prisma";
  * including any existing AI-suggested alternatives.
  */
 export async function GET() {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   try {
     // Find all PO line items marked as out of stock
     const oosItems = await prisma.pOLineItem.findMany({

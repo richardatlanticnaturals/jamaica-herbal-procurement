@@ -131,9 +131,10 @@ export async function POST(
       return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
     }
 
-    if (po.status !== "APPROVED") {
+    // Allow sending APPROVED POs and resending already-SENT POs
+    if (po.status !== "APPROVED" && po.status !== "SENT") {
       return NextResponse.json(
-        { error: `Cannot send a PO with status: ${po.status}. Must be APPROVED first.` },
+        { error: `Cannot send a PO with status: ${po.status}. Must be APPROVED or SENT.` },
         { status: 400 }
       );
     }
@@ -164,17 +165,23 @@ export async function POST(
     }
 
     // Email sent successfully — update PO status
+    const isResend = po.status === "SENT";
     const updated = await prisma.purchaseOrder.update({
       where: { id },
       data: {
         status: "SENT",
         sentAt: new Date(),
-        expectedDate: new Date(Date.now() + (po.vendor.leadTimeDays || 3) * 24 * 60 * 60 * 1000),
+        // Only set expectedDate on first send, not on resend
+        expectedDate: isResend
+          ? undefined
+          : new Date(Date.now() + (po.vendor.leadTimeDays || 3) * 24 * 60 * 60 * 1000),
         statusHistory: {
           create: {
-            fromStatus: "APPROVED",
+            fromStatus: po.status,
             toStatus: "SENT",
-            note: `PO emailed to ${po.vendor.email} (Message ID: ${result.messageId})`,
+            note: isResend
+              ? `PO re-sent to ${po.vendor.email} (Message ID: ${result.messageId})`
+              : `PO emailed to ${po.vendor.email} (Message ID: ${result.messageId})`,
             triggeredBy: "user",
           },
         },

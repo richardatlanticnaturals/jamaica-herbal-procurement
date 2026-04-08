@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
+import { POStatus } from "@/lib/generated/prisma/enums";
 
 /**
  * Import POs from Comcash admin scrape data.
@@ -61,8 +62,8 @@ export async function POST(request: NextRequest) {
         const expectedDate = po.requiredDate ? new Date(po.requiredDate) : null;
         const receivedAt = po.received ? new Date(po.received) : null;
 
-        // Map Comcash status to our PO status
-        let status: string;
+        // Map Comcash status to our PO status enum
+        let status: POStatus;
         switch (po.status.toLowerCase()) {
           case "closed":
             status = "CLOSED";
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
           data: {
             poNumber,
             vendorId: vendor.id,
-            status: status as any,
+            status,
             subtotal: total,
             total: total,
             orderMethod: "EMAIL",

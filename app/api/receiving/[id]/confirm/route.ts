@@ -65,6 +65,16 @@ export async function POST(
       );
     }
 
+    // Validate quantities before processing
+    for (const item of lineItems) {
+      if (item.qtyReceived < 0) {
+        return NextResponse.json(
+          { error: `Quantity received cannot be negative` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Process everything in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // 1. Update each ReceivingLineItem
@@ -98,6 +108,15 @@ export async function POST(
           );
 
           if (poLine) {
+            // Over-receiving guard: warn but still allow (some vendors ship extra)
+            const newTotalReceived = poLine.qtyReceived + item.qtyReceived;
+            if (newTotalReceived > poLine.qtyOrdered * 2) {
+              // Hard cap at 2x ordered quantity to catch data entry mistakes
+              throw new Error(
+                `Receiving ${item.qtyReceived} of "${poLine.description}" would exceed 2x the ordered quantity (${poLine.qtyOrdered}). Please verify the quantity.`
+              );
+            }
+
             await tx.pOLineItem.update({
               where: { id: poLine.id },
               data: {

@@ -125,7 +125,7 @@ export async function POST(
     return NextResponse.json({
       emailData: {
         to: po.vendor.email,
-        subject: `Purchase Order ${escapeHtml(po.poNumber)} - Jamaica Herbal`,
+        subject: `Purchase Order ${po.poNumber} - Jamaica Herbal`,
         body: emailBody,
         bodyType: "html",
         poNumber: po.poNumber,
