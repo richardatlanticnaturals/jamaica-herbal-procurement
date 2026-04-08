@@ -1,0 +1,1762 @@
+{
+  "info": {
+    "_postman_id": "7d5bad4e-a326-481c-8475-080a0e67dfe9",
+    "name": "OPEN_API_EMPLOYEE",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "53576538",
+    "_collection_link": "https://go.postman.co/collection/53576538-7d5bad4e-a326-481c-8475-080a0e67dfe9?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Auth / Signin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonResponse = pm.response.json();",
+                  "pm.environment.set(\"jwt\", jsonResponse.accessToken);",
+                  "",
+                  "",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X_API_KEY",
+                "value": "{{xApiKey}}",
+                "disabled": true
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openApiKey\": \"{{openApiKey}}\",\n  \"pin\": \"{{pin}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/auth/signin",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "auth",
+                "signin"
+              ]
+            },
+            "description": "Signin\n* **openApiKey** - parameter which can be taken from Company settings\n* **pin** - pin code of the employee \n* **password** - password of the employee"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Customer",
+      "item": [
+        {
+          "name": "Customer / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\" : \"20\",\n  \"offset\": \"0\",\n  \"order\": \"asc\",\n  \"type\":0,\n  \"ids\": []\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/customer/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "customer",
+                "list"
+              ]
+            },
+            "description": "* **limit** (numerical value, 20 as default) allows you to set the number of objects returned in one page. \n* **offset** (numerical value, 0 as default) allows you to specify the ranking number of the first item on the page.\n* **sort** (default value \"id\", also it's possible to sort by \"created\") allows you to sort records according to selected value\n* **order** (default value \"asc\") allows you to order records in increasing or decreasing order \n* **type** (numerical value) - customer type id of the customers\n* **status** (numerical value) - allows you to filter customers according to theirs status (e.g. 1 - active, 2 - deleted)\n* **ids** (array) - list of the specific customers divided by comma\n* **createdAfter** and **createdBefore** (numerical) time parameters which can be used separately or as time interval from/to"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"countryPhoneCode\": \"1\",\n\t\"phone\": \"55555555\",\n\t\"email\": \"55555555@example.com\",\n\t\"firstName\": \"Test\",\n\t\"lastName\": \"Test\",\n\t\"locationId\": \"3\",\n\t\"billingAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\"\n\t},\n\t\"deliveryAddress\": {\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\",\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\",\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"661695\"\n\t}\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/customer/create",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "customer",
+                "create"
+              ]
+            },
+            "description": "* **countryPhoneCode** (numerical value) - required, integer only\n* **firstName** (string) - max length 128, should consist of characters and digits only\n* **email** (string) - unique email\n* **phone** (numerical) - unique phone, 6-12 digits\n* **locationId** (numerical value) - sales outlet id\n* **billingAddress** (object) - allows to specify the billing address. \n {addressLine1, city, country, postalCode} are required fields\n* **deliveryAddress** (object) - allows to specify the delivery address.\n {addressLine1, city, country, postalCode} are required fields"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Info",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"customerId\": 20\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/customer/info",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "customer",
+                "info"
+              ]
+            },
+            "description": "* **customerId** (numerical value) - required, min value = 1"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Sales",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"customerId\": 150,\n\t\"limit\": 100,\n\t\"offset\": 0,\n\t\"order\": \"desc\",\n\t\"status\":1\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/customer/sales",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "customer",
+                "sales"
+              ]
+            },
+            "description": "* **limit** (numerical value, 20 as default) allows you to set the number of objects returned in one page. \r\n* **offset** (numerical value, 0 as default) allows you to specify the ranking number of the first item on the page.\r\n* **order** (default value \"asc\") allows you to order records in increasing or decreasing order \r\n* **customerId** (numerical value, min value => 1, *optional*)\r\n* **id** (default value *null*) - allows you to search sales via id or offline sale id (partial match)\r\n* **status** allows you to request sales according their status (e.g. completed sales/suspended sales)\r\n* **timeFrom** and **timeTo** (numerical) time parameters which can be used as time interval from/to"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Update Settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"customerId\": 14036,\n\t\"mailingList\": 1,\n\t\"trackLoyaltyPoints\": 1,\n    \"locationId\": \"4\",\n\t\"billingAddress\": {\n\t\t\"addressLine1\": \"250 Maple St\",\n\t\t\"addressLine2\": \"251 Maple St\",\n\t\t\"city\": \"New Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11226\",\n\t\t\"region\": \"NY\"\n\t},\n\t\"deliveryAddress\": {\n\t\t\"firstName\": \"Test1\",\n\t\t\"lastName\": \"User1\",\n\t\t\"addressLine1\": \"250 Maple St\",\n\t\t\"addressLine2\": \"251 Maple St\",\n\t\t\"city\": \"New Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11226\",\n\t\t\"region\": \"NY\",\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"661696\"\n\t}\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/customer/updateSettings",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "customer",
+                "updateSettings"
+              ]
+            },
+            "description": "* **customerId** (numerical value) - required, min value = 1\n* **mailingList** (numerical value)- (e.g. 0 - deny, 1 - allow)\n* **trackLoyaltyPoints** (numerical value)- (e.g. 0 - deny, 1 - allow)\n* **locationId** (numerical value) - sales outlet id\n* **billingAddress** (object) - allows to specify the billing address. \n {addressLine1, city, country, postalCode} are required fields\n* **deliveryAddress** (object) - allows to specify the delivery address.\n {addressLine1, city, country, postalCode} are required fields"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Delete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"customerId\": 8704\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/customer/delete",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "customer",
+                "delete"
+              ]
+            },
+            "description": "* **customerId** (numerical value) - required, min value = 1"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Update Points",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"customerId\": 19,\n\t\"storeCredit\": 700.00,\n\t\"pointsBalance\": 100.00\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/customer/updatePoints",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "customer",
+                "updatePoints"
+              ]
+            },
+            "description": "* **customerId** (numerical value) - required, min value = 1\n* **storeCredit** (numerical value) - optional\n* **pointsBalance** (numerical value) - optional"
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / Add Points",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "default"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "default"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n\t\"customerId\": 14058,\r\n\t\"points\": 150.00\r\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/customer/addCustomerPoints",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "customer",
+                "addCustomerPoints"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Customer / update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"id\": \"13996\",\n    \"typeId\": \"18\",\n\t\"countryPhoneCode\": \"34\",\n\t\"phone\": \"555677\",\n\t\"email\": \"55555@example.com\",\n\t\"firstName\": \"Test\",\n\t\"lastName\": \"Test\",\n\t\"locationId\": \"3\",\n\t\"billingAddress\": {\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\"\n\t},\n\t\"deliveryAddress\": {\n\t\t\"firstName\": \"Test\",\n\t\t\"lastName\": \"User\",\n\t\t\"addressLine1\": \"249 Maple St\",\n\t\t\"addressLine2\": \"\",\n\t\t\"city\": \"Brooklyn\",\n\t\t\"country\": \"us\",\n\t\t\"postalCode\": \"11225\",\n\t\t\"region\": \"NY\",\n\t\t\"countryPhoneCode\": \"+1\",\n\t\t\"phone\": \"661695\"\n\t}\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/customer/update",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "customer",
+                "update"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sale",
+      "item": [
+        {
+          "name": "Sale / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"limit\": 5,\n    \"offset\": 0,\n    \"sort\": \"created\",\n    \"order\": \"desc\",\n    \"status\": 2,\n    \"customerId\": 5,\n    \"employeeId\": 2,\n    \"timeFrom\": 1637107200,\n    \"timeTo\": 1637153999,\n    \"salesOutletIds\": [1, 2, 3],\n    \"ids\": [555, 123, 777]\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/sale/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "sale",
+                "list"
+              ]
+            },
+            "description": "**Request body:**\n\n* **limit** (numerical value, 100 as default) allows you to set the number of objects returned in one page. \n* **offset** (numerical value, 0 as default) allows you to specify the ranking number of the first item on the page.\n* **sort** (default value \"id\", allow: \"id\", \"created\") allows you to sort records according to selected value\n* **order** (default value \"asc\", allow: \"asc\", \"desc\") allows you to order records in increasing or decreasing order\n* **status** (numerical value, *optional*) - allows you to filter sales according to theirs status: 1 - completed, 2 - suspended\n* **customerId** (numerical value, *optional*) allows you to filter sales by customer\n* **employeeId** (numerical value, *optional*) allows you to filter sales by employee\n* **timeFrom** and **timeTo** (numerical, *optional*) allows you to filter sales by time interval from/to\n* **timeUpdatedFrom** (numerical, *optional*) allows you to filter sales by updated time \n* **salesOutletIds** (array, *optional*) allows you to filter sales by sales outlets\n* **ids** (array, *optional*) allows you to filter sales by ids"
+          },
+          "response": [
+            {
+              "name": "Get 5 suspended sales sorted by created time new first which was updated from 11/15/2021 12:00:00 AM",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"limit\": 5,\n    \"sort\": \"created\",\n    \"order\": \"desc\",\n    \"status\": 2,\n    \"timeUpdatedFrom\": 1636934400\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{url}}/employee/sale/list",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "employee",
+                    "sale",
+                    "list"
+                  ]
+                }
+              },
+              "_postman_previewlanguage": "Text",
+              "header": null,
+              "cookie": [],
+              "body": null
+            },
+            {
+              "name": "Get 100 suspended sales sorted by created time new first",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"sort\": \"created\",\n    \"order\": \"desc\",\n    \"status\": 2\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{url}}/employee/sale/list",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "employee",
+                    "sale",
+                    "list"
+                  ]
+                }
+              },
+              "_postman_previewlanguage": "Text",
+              "header": null,
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "Sale / Payment Info",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"saleTransactionIds\": [\n\t\t268997, 268996\n\t]\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/sale/paymentsInfo",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "sale",
+                "paymentsInfo"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sale / Sync completed sale with electronic payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"salesOutletId\": 2,\n\t\"customerId\": 1,\n\t\"timeCreated\": 1630929089,\n\t\"paymentProviderType\": \"1\",\n\t\"salesEmployeeId\": \"1\",\n\n\t\"payment\": [{\n\t\t\"tenderId\": 7,\n\t\t\"amount\": 25.29,\n\t\t\"referenceNumber\": \"9068148993479614\",\n\t\t\"customerSignatureBase64\": \"\",\n\t\t\"electronicTransactionId\": \"43155124\",\n\t\t\"timeCreated\": 0,\n\t\t\"status\": \"1\",\n\t\t\"cardType\": \"Credit\",\n\t\t\"entryMode\": \"Swiped\",\n\t\t\"approvalCode\": \"000025\",\n\t\t\"cardNumberMasked\": \"************4111\",\n\t\t\"isEbtCash\": 0,\n\t\t\"emv\": [],\n\t\t\"name\": \"Mastercard\",\n\t\t\"typeId\": 26\n\t}],\n\t\n\n\t\"products\": [{\n\t\t\"productId\": 1433,\n\t\t\"quantity\": 2.0,\n\t\t\"price\": 15.00,\n\t\t\"discounts\": [{\n\t\t\t\"id\": 601,\n\t\t\t\"amount\": -10.00,\n\t\t\t\"appliedQuantity\": 2.00,\n\t\t\t\"barcode\": \"\",\n\t\t\t\"title\": \"Combine 1 Default\",\n\t\t\t\"typeId\": \"3\",\n\t\t\t\"systemTypeId\": \"1\",\n\t\t\t\"applyMode\": \"1\",\n\t\t\t\"percentageAmount\": 0.00,\n\t\t\t\"fixedAmount\": 5.00\n\t\t}],\n\t\t\"taxes\": [\n\t\t\t{\n\t\t\t\t\"id\": 37,\n\t\t\t\t\"name\": \"CALIFORNIA state tax\",\n\t\t\t\t\"taxPercentageAmount\": 6.50,\n\t\t\t\t\"taxFixedAmount\": 0.00,\n\t\t\t\t\"maxTaxableAmount\": 0.00,\n\t\t\t\t\"amount\": 1.30,\n\t\t\t\t\"subtaxIds\": [],\n\t\t\t\t\"enableOnToGo\": 0\n\t\t\t},\n\t\t\t{\n\t\t\t\t\"id\": 164,\n\t\t\t\t\"name\": \"LOS ANGELES CO county tax in CA state\",\n\t\t\t\t\"taxPercentageAmount\": 1.00,\n\t\t\t\t\"taxFixedAmount\": 0.00,\n\t\t\t\t\"maxTaxableAmount\": 0.00,\n\t\t\t\t\"amount\": 0.20,\n\t\t\t\t\"subtaxIds\": [],\n\t\t\t\t\"enableOnToGo\": 0\n\t\t\t},\n\t\t\t{\n\t\t\t\t\"id\": 165,\n\t\t\t\t\"name\": \"CA state transit sale tax (Signature Code: AHBI) (Transit Tax Code: 218)\",\n\t\t\t\t\"taxPercentageAmount\": 1.50,\n\t\t\t\t\"taxFixedAmount\": 0.00,\n\t\t\t\t\"maxTaxableAmount\": 0.00,\n\t\t\t\t\"amount\": 0.30,\n\t\t\t\t\"subtaxIds\": [],\n\t\t\t\t\"enableOnToGo\": 0\n\t\t\t}\n\t\t]\n\t}]\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/sale/sync",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "sale",
+                "sync"
+              ]
+            },
+            "description": "* **salesOutletId**       (numerical) \n* **customerId**          (numerical) Walking customer ID is \"1\"\n* **timeCreated**         (numerical) unix timestamp when the sale was created.\n* **paymentProviderType** (numerical) Payment Provider [1: Element, 2: PayPal, 3: DataCap, 5: Hosted Checkout, 6: Open Edge, 9: Shift4]\n* **salesEmployeeId**     (numerical)  \n* **payment**             (array of objects) \n* **products**            (array of objects)\n* **billingAddress**       (object, optional) Delivery details\n {addressLine1, city, country, postalCode} are required fields\n* **deliveryAddress**      (object, optional) Delivery details\n {addressLine1, city, country, postalCode} are required fields\n* **customerData**\t\t  (object, optional) Delivery details\n* **shippingAmount**      (numerical, optional) Delivery details\n* **deliveryType**        (numerical, optional) [2: Ship it/Custom Shipping rate]  Delivery details"
+          },
+          "response": []
+        },
+        {
+          "name": "Sale / Sync completed sale with shipping options",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"salesOutletId\": 2,\n\t\"customerId\": 1,\n\t\"timeCreated\": 1630929089,\n\t\"paymentProviderType\": \"1\",\n\t\"salesEmployeeId\": \"1\",\n\n\t\"payment\": [{\n\t\t\"tenderId\": 7,\n\t\t\"amount\": 25.29,\n\t\t\"referenceNumber\": \"9068148993479614\",\n\t\t\"customerSignatureBase64\": \"\",\n\t\t\"electronicTransactionId\": \"43155124\",\n\t\t\"timeCreated\": 0,\n\t\t\"status\": \"1\",\n\t\t\"cardType\": \"Credit\",\n\t\t\"entryMode\": \"Swiped\",\n\t\t\"approvalCode\": \"000025\",\n\t\t\"cardNumberMasked\": \"************4111\",\n\t\t\"isEbtCash\": 0,\n\t\t\"emv\": [],\n\t\t\"name\": \"Mastercard\",\n\t\t\"typeId\": 26\n\t}],\n\t\n\t\n\t\"products\": [{\n\t\t\"productId\": 1433,\n\t\t\"quantity\": 2.0,\n\t\t\"price\": 15.00,\n\t\t\"discounts\": [{\n\t\t\t\"id\": 601,\n\t\t\t\"amount\": -10.00,\n\t\t\t\"appliedQuantity\": 2.00,\n\t\t\t\"barcode\": \"\",\n\t\t\t\"title\": \"Combine 1 Default\",\n\t\t\t\"typeId\": \"3\",\n\t\t\t\"systemTypeId\": \"1\",\n\t\t\t\"applyMode\": \"1\",\n\t\t\t\"percentageAmount\": 0.00,\n\t\t\t\"fixedAmount\": 5.00\n\t\t}],\n\t\t\"taxes\": [\n\t\t\t{\n\t\t\t\t\"id\": 37,\n\t\t\t\t\"name\": \"CALIFORNIA state tax\",\n\t\t\t\t\"taxPercentageAmount\": 6.50,\n\t\t\t\t\"taxFixedAmount\": 0.00,\n\t\t\t\t\"maxTaxableAmount\": 0.00,\n\t\t\t\t\"amount\": 1.30,\n\t\t\t\t\"subtaxIds\": [],\n\t\t\t\t\"enableOnToGo\": 0\n\t\t\t},\n\t\t\t{\n\t\t\t\t\"id\": 164,\n\t\t\t\t\"name\": \"LOS ANGELES CO county tax in CA state\",\n\t\t\t\t\"taxPercentageAmount\": 1.00,\n\t\t\t\t\"taxFixedAmount\": 0.00,\n\t\t\t\t\"maxTaxableAmount\": 0.00,\n\t\t\t\t\"amount\": 0.20,\n\t\t\t\t\"subtaxIds\": [],\n\t\t\t\t\"enableOnToGo\": 0\n\t\t\t},\n\t\t\t{\n\t\t\t\t\"id\": 165,\n\t\t\t\t\"name\": \"CA state transit sale tax (Signature Code: AHBI) (Transit Tax Code: 218)\",\n\t\t\t\t\"taxPercentageAmount\": 1.50,\n\t\t\t\t\"taxFixedAmount\": 0.00,\n\t\t\t\t\"maxTaxableAmount\": 0.00,\n\t\t\t\t\"amount\": 0.30,\n\t\t\t\t\"subtaxIds\": [],\n\t\t\t\t\"enableOnToGo\": 0\n\t\t\t}\n\t\t]\n\t}],\n\t\n\t\"deliveryAddress\": {\n\t\t\"firstName\": \"John\",\n\t\t\"lastName\": \"Doe\",\n\t\t\"country\": \"us\",\n\t\t\"region\": \"CA\",\n\t\t\"city\": \"Colton\",\n\t\t\"postalCode\": \"92324\",\n\t\t\"addressLine1\": \"2147 Bel Meadow Drive\",\n\t\t\"addressLine2\": \"\",\n\t\t\"countryPhoneCode\": \"1\",\n\t\t\"phone\": \"9094244321\"\n\n\t},\n\t\n\t\"billingAddress\": {\n\t\t\"country\": \"us\",\n\t\t\"region\": \"CA\",\n\t\t\"city\": \"Colton\",\n\t\t\"postalCode\": \"92324\",\n\t\t\"addressLine1\": \"2147 Bel Meadow Drive\",\n\t\t\"addressLine2\": \"\",\n\t\t\"countryPhoneCode\": \"1\",\n\t\t\"phone\": \"9094244321\"\n\t},\n\t\n\t\"customerData\": {\n\t\t\"countryPhoneCode\": \"1\",\n\t\t\"phone\": \"9094244321\",\n\t\t\"firstName\": \"John\",\n\t\t\"lastName\": \"Doe\",\n\t\t\"email\": \"test@gmail.com\",\n\t\t\"note\": \"Some customer data note\"\n\t},\n\t\n\t\"shippingAmount\": 3.49,\n\t\"deliveryType\": \"2\",\n\t\"deliveryNote\": \"Some delivery note\"\n\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/sale/sync",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "sale",
+                "sync"
+              ]
+            },
+            "description": "* **salesOutletId**       (numerical) \n* **customerId**          (numerical) Walking customer ID is \"1\"\n* **timeCreated**         (numerical) unix timestamp when the sale was created.\n* **paymentProviderType** (numerical) Payment Provider [1: Element, 2: PayPal, 3: DataCap, 5: Hosted Checkout, 6: Open Edge, 9: Shift4]\n* **salesEmployeeId**     (numerical)  \n* **payment**             (array of objects) \n* **products**            (array of objects)\n* **deliveryAddress**     (object, optional) Delivery details. country, city, postalCode, addressLine1 are required fields.\n* **billingAddress**      (object, optional) Delivery details. country, city, postalCode, addressLine1 are required fields.\n* **customerData**\t\t  (object, optional) Delivery details\n* **shippingAmount**      (numerical, optional) Delivery details\n* **deliveryType**        (numerical, optional) [2: Ship it/Custom Shipping rate]  Delivery details\n* **deliveryNote**        (string, optional) Delivery note with max length is 2000 chars"
+          },
+          "response": []
+        },
+        {
+          "name": "Sale / Sync Coupon",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"salesOutletId\": 2,\n\t\"customerId\": 92,\n\t\"timeCreated\": 1585068041,\n\t\"paymentProviderType\": \"3\",\n\t\"salesEmployeeId\": \"1\",\n\n\t\"payment\": [{\n      \"tenderId\": 3,\n      \"amount\": 144.79,\n      \"roundingAmount\": 0.0,\n      \"timeCreated\": 0,\n      \"isEbtCash\": 0,\n      \"emv\": [],\n      \"name\": \"Coupon\",\n      \"typeId\": 21\n\t}],\n\n\t\"products\": [{\n\t\t\"productId\": 9690,\n\t\t\"quantity\": 1.0,\n\t\t\"price\": 150.00,\n\n\t\t\"discounts\": [{\n\t\t\t\"id\": 86,\n\t\t\t\"amount\": -15.00,\n\t\t\t\"title\": \"Discount for all\",\n\t\t\t\"typeId\": \"10\",\n\t\t\t\"systemTypeId\": \"1\",\n\t\t\t\"applyMode\": \"1\",\n\t\t\t\"percentageAmount\": 10.00,\n\t\t\t\"fixedAmount\": 0.00\n\t\t}],\n\n\t\t\"taxes\": [{\n\t\t\t\"id\": 2,\n\t\t\t\"name\": \"SISKIYOU\",\n\t\t\t\"taxPercentageAmount\": 7.25,\n\t\t\t\"taxFixedAmount\": 0.00,\n\t\t\t\"maxTaxableAmount\": 0.00,\n\t\t\t\"amount\": 9.79,\n\t\t\t\"subtaxIds\": [],\n\t\t\t\"enableOnToGo\": 0\n\t\t}]\n\t}]\n\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/sale/sync",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "sale",
+                "sync"
+              ]
+            },
+            "description": "Electronic Payment with coupon"
+          },
+          "response": []
+        },
+        {
+          "name": "Sale / Sync Store Credit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"salesOutletId\": 2,\n\t\"customerId\": 92,\n\t\"timeCreated\": 1585067957,\n\t\"paymentProviderType\": \"3\",\n\t\"salesEmployeeId\": \"1\",\n\n\t\"payment\": [{\n\t\t\"tenderId\": 5,\n\t\t\"amount\": 144.79,\n\t\t\"roundingAmount\": 0.0,\n\t\t\"timeCreated\": 0,\n\t\t\"isEbtCash\": 0,\n\t\t\"emv\": [],\n\t\t\"name\": \"Store Credit\",\n\t\t\"typeId\": 15\n\t}],\n\n\t\"products\": [{\n\t\t\"productId\": 9690,\n\t\t\"quantity\": 1.0,\n\t\t\"price\": 150.00,\n\n\t\t\"discounts\": [{\n\t\t\t\"id\": 86,\n\t\t\t\"amount\": -15.00,\n\t\t\t\"title\": \"Discount for all\",\n\t\t\t\"typeId\": \"10\",\n\t\t\t\"systemTypeId\": \"1\",\n\t\t\t\"applyMode\": \"1\",\n\t\t\t\"percentageAmount\": 10.00,\n\t\t\t\"fixedAmount\": 0.00\n\t\t}],\n\n\t\t\"taxes\": [{\n\t\t\t\"id\": 2,\n\t\t\t\"name\": \"SISKIYOU\",\n\t\t\t\"taxPercentageAmount\": 7.25,\n\t\t\t\"taxFixedAmount\": 0.00,\n\t\t\t\"maxTaxableAmount\": 0.00,\n\t\t\t\"amount\": 9.79,\n\t\t\t\"subtaxIds\": [],\n\t\t\t\"enableOnToGo\": 0\n\t\t}]\n\t}]\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/sale/sync",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "sale",
+                "sync"
+              ]
+            },
+            "description": "Store Credit Payment"
+          },
+          "response": []
+        },
+        {
+          "name": "Sale / Sync created suspended sale with electronic payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonResponse = pm.response.json();",
+                  "pm.environment.set(\"transactionId\", jsonResponse.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": 2,\n  \"salesOutletId\":1,\n  \"customerId\": 1,\n  \"timeCreated\": 1636975166,\n  \"deliveryMode\": \"1\",\n  \"employeeId\": 1,\n  \"isOfflineSale\": 0,\n  \"payment\": [],\n  \"discounts\": [\n    {\n      \"amount\": 0.0,\n      \"id\": 645,\n      \"title\": \"Brand Walkin\",\n      \"percentageAmount\": 20.00,\n      \"fixedAmount\": 0.00,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"1\",\n      \"timeFrom\": 1634194800,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 650,\n      \"title\": \"Discount for walk in\",\n      \"percentageAmount\": 25.00,\n      \"fixedAmount\": 0.00,\n      \"typeId\": \"3\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"1\",\n      \"timeFrom\": 1634799600,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    }\n  ],\n  \"products\": [\n    {\n      \"productId\": 393,\n      \"offlineId\": \"27b062ad-175f-469c-9144-7e9aee9954b7\",\n      \"quantity\": 1.0,\n      \"price\": 20.00,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 0,\n      \"addedTime\": 1636975160,\n      \"uniquenessHash\": \"8ee55fb3ed876595c7a0e74f42670985\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 12764,\n      \"quantity\": 2.0,\n      \"price\": 200.00,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 1,\n      \"addedTime\": 1636975158,\n      \"uniquenessHash\": \"27c723a28d672da85d7bffc63ab28663\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -100.00,\n          \"id\": 650,\n          \"title\": \"Discount for walk in\",\n          \"percentageAmount\": 25.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"3\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"4\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1634799600,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": [\n        {\n          \"id\": 3,\n          \"name\": \"10%\",\n          \"taxPercentageAmount\": 10.000,\n          \"taxFixedAmount\": 0.00,\n          \"maxTaxableAmount\": 0.00,\n          \"amount\": 27.27,\n          \"subtaxIds\": [],\n          \"tiers\": [],\n          \"enableOnToGo\": 0\n        }\n      ]\n    }\n  ],\n  \"paymentProviderType\": \"3\",\n  \"interiorTableId\": 85,\n  \"deliveryStatus\": \"0\",\n  \"overrideCustomerCreditLimit\": 0,\n  \"customAttributes\": [],\n  \"shippingAmount\": 0.0\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/sale/sync",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "sale",
+                "sync"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Sale / Sync created suspended sale without payment",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "type": "text",
+                    "value": "Bearer {{jwt}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": 2,\n  \"salesOutletId\":1,\n  \"timeCreated\": 1637107200,\n  \"employeeId\": 1,\n  \"customerId\": 1,\n  \"products\": [\n    {\n      \"productId\": 393,\n      \"quantity\": 1.0,\n      \"price\": 20.00\n    },\n    {\n      \"productId\": 12764,\n      \"quantity\": 2.0,\n      \"price\": 200.00\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{url}}/employee/sale/sync",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "employee",
+                    "sale",
+                    "sync"
+                  ]
+                }
+              },
+              "_postman_previewlanguage": "Text",
+              "header": null,
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "Sale / Sync updated suspended sale with electronic payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": {{transactionId}},\n  \"status\": 2,\n  \"salesOutletId\":1,\n  \"customerId\": 9292,\n  \"timeCreated\": 1636975341,\n  \"deliveryMode\": \"1\",\n  \"employeeId\": 1,\n  \"salesEmployeeId\": 1,\n  \"isOfflineSale\": 0,\n  \"payment\": [\n    {\n      \"subOrderId\": 1,\n      \"tenderId\": 6,\n      \"amount\": 2.0,\n      \"surchargeAmount\": 0.0,\n      \"roundingAmount\": 0.0,\n      \"timeCreated\": 0,\n      \"isEbtCash\": 0,\n      \"emv\": [],\n      \"name\": \"Cash\",\n      \"typeId\": 25\n    }\n  ],\n  \"discounts\": [\n    {\n      \"amount\": 0.0,\n      \"id\": 645,\n      \"title\": \"Brand Walkin\",\n      \"percentageAmount\": 20.0,\n      \"fixedAmount\": 0.0,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"1\",\n      \"allocationMode\": 0,\n      \"timeFrom\": 0,\n      \"timeTo\": 0,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 0\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 650,\n      \"title\": \"Discount for walk in\",\n      \"percentageAmount\": 25.0,\n      \"fixedAmount\": 0.0,\n      \"typeId\": \"3\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"1\",\n      \"allocationMode\": 0,\n      \"timeFrom\": 0,\n      \"timeTo\": 0,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 0\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 142,\n      \"title\": \"$10 fixed universal manual\",\n      \"percentageAmount\": 0.00,\n      \"fixedAmount\": 11.00,\n      \"typeId\": \"10\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"2\",\n      \"allocationMode\": \"1\",\n      \"timeFrom\": 1519286400,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 254,\n      \"title\": \"Brand Discount with Customer Type Filter\",\n      \"percentageAmount\": 0.00,\n      \"fixedAmount\": 20.00,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"4\",\n      \"timeFrom\": 1532415600,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 401,\n      \"title\": \"Brand\",\n      \"percentageAmount\": 25.00,\n      \"fixedAmount\": 0.00,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"4\",\n      \"timeFrom\": 1571814000,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 647,\n      \"title\": \"Customer type discount \",\n      \"percentageAmount\": 10.00,\n      \"fixedAmount\": 0.00,\n      \"typeId\": \"3\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"1\",\n      \"timeFrom\": 1634799600,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    }\n  ],\n  \"products\": [\n    {\n      \"productId\": 8011,\n      \"quantity\": 1.0,\n      \"price\": 44.99,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 0,\n      \"addedTime\": 1636975211,\n      \"uniquenessHash\": \"f4a41f0f46ab11994d2dda68020dd424\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -1.53,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 1.532,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -4.50,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 3476,\n      \"quantity\": 1.0,\n      \"price\": 18.00,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 1,\n      \"addedTime\": 1636975210,\n      \"uniquenessHash\": \"704dac316a7ab3a2d94906265e0cfb3d\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -0.61,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 0.613,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -1.80,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 3477,\n      \"quantity\": 1.0,\n      \"price\": 40.00,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 2,\n      \"addedTime\": 1636975209,\n      \"uniquenessHash\": \"0fa4fa57bd8637d5c595572ba9fb3ad4\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -1.37,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 1.362,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -4.00,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 393,\n      \"saleProductId\": 56444,\n      \"offlineId\": \"27b062ad-175f-469c-9144-7e9aee9954b7\",\n      \"quantity\": 1.0,\n      \"price\": 20.0,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 3,\n      \"addedTime\": 1636975160,\n      \"uniquenessHash\": \"8ee55fb3ed876595c7a0e74f42670985\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -0.68,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 0.681,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -2.00,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 12764,\n      \"saleProductId\": 56445,\n      \"quantity\": 1.0,\n      \"price\": 200.0,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 4,\n      \"addedTime\": 1636975158,\n      \"uniquenessHash\": \"27c723a28d672da85d7bffc63ab28663\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -6.81,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 6.811,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -20.00,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -50.00,\n          \"id\": 650,\n          \"title\": \"Discount for walk in\",\n          \"percentageAmount\": 25.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"3\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"4\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1634799600,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": [\n        {\n          \"id\": 3,\n          \"name\": \"10%\",\n          \"taxPercentageAmount\": 10.000,\n          \"taxFixedAmount\": 0.00,\n          \"maxTaxableAmount\": 0.00,\n          \"amount\": 11.20,\n          \"subtaxIds\": [],\n          \"tiers\": [],\n          \"enableOnToGo\": 0\n        }\n      ]\n    }\n  ],\n  \"paymentProviderType\": \"3\",\n  \"interiorTableId\": 85,\n  \"deliveryStatus\": \"0\",\n  \"overrideCustomerCreditLimit\": 0,\n  \"customAttributes\": [],\n  \"shippingAmount\": 0.0\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/sale/sync",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "sale",
+                "sync"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sale / Sync updated suspended sale with electronic payment 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": {{transactionId}},\n  \"status\": 2,\n  \"salesOutletId\":1,\n  \"customerId\": 9292,\n  \"timeCreated\": 1636975341,\n  \"deliveryMode\": \"1\",\n  \"employeeId\": 1,\n  \"salesEmployeeId\": 1,\n  \"isOfflineSale\": 0,\n  \"payment\": [\n    {\n      \"subOrderId\": 1,\n      \"tenderId\": 6,\n      \"amount\": 2.0,\n      \"surchargeAmount\": 0.0,\n      \"roundingAmount\": 0.0,\n      \"timeCreated\": 0,\n      \"isEbtCash\": 0,\n      \"emv\": [],\n      \"name\": \"Cash\",\n      \"typeId\": 25\n    }\n  ],\n  \"discounts\": [\n    {\n      \"amount\": 0.0,\n      \"id\": 645,\n      \"title\": \"Brand Walkin\",\n      \"percentageAmount\": 20.0,\n      \"fixedAmount\": 0.0,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"1\",\n      \"allocationMode\": 0,\n      \"timeFrom\": 0,\n      \"timeTo\": 0,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 0\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 650,\n      \"title\": \"Discount for walk in\",\n      \"percentageAmount\": 25.0,\n      \"fixedAmount\": 0.0,\n      \"typeId\": \"3\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"1\",\n      \"allocationMode\": 0,\n      \"timeFrom\": 0,\n      \"timeTo\": 0,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 0\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 142,\n      \"title\": \"$10 fixed universal manual\",\n      \"percentageAmount\": 0.00,\n      \"fixedAmount\": 11.00,\n      \"typeId\": \"10\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"2\",\n      \"allocationMode\": \"1\",\n      \"timeFrom\": 1519286400,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 254,\n      \"title\": \"Brand Discount with Customer Type Filter\",\n      \"percentageAmount\": 0.00,\n      \"fixedAmount\": 20.00,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"4\",\n      \"timeFrom\": 1532415600,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 401,\n      \"title\": \"Brand\",\n      \"percentageAmount\": 25.00,\n      \"fixedAmount\": 0.00,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"4\",\n      \"timeFrom\": 1571814000,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 647,\n      \"title\": \"Customer type discount \",\n      \"percentageAmount\": 10.00,\n      \"fixedAmount\": 0.00,\n      \"typeId\": \"3\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"1\",\n      \"timeFrom\": 1634799600,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    }\n  ],\n  \"products\": [\n    {\n      \"productId\": 8011,\n      \"quantity\": 1.0,\n      \"price\": 44.99,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 0,\n      \"addedTime\": 1636975211,\n      \"uniquenessHash\": \"f4a41f0f46ab11994d2dda68020dd424\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -1.53,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 1.532,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -4.50,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 3476,\n      \"quantity\": 1.0,\n      \"price\": 18.00,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 1,\n      \"addedTime\": 1636975210,\n      \"uniquenessHash\": \"704dac316a7ab3a2d94906265e0cfb3d\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -0.61,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 0.613,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -1.80,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 3477,\n      \"quantity\": 1.0,\n      \"price\": 40.00,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 2,\n      \"addedTime\": 1636975209,\n      \"uniquenessHash\": \"0fa4fa57bd8637d5c595572ba9fb3ad4\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -1.37,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 1.362,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -4.00,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 393,\n      \"saleProductId\": 56444,\n      \"offlineId\": \"27b062ad-175f-469c-9144-7e9aee9954b7\",\n      \"quantity\": 1.0,\n      \"price\": 20.0,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 3,\n      \"addedTime\": 1636975160,\n      \"uniquenessHash\": \"8ee55fb3ed876595c7a0e74f42670985\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -0.68,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 0.681,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -2.00,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 12764,\n      \"saleProductId\": 56445,\n      \"quantity\": 1.0,\n      \"price\": 200.0,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 4,\n      \"addedTime\": 1636975158,\n      \"uniquenessHash\": \"27c723a28d672da85d7bffc63ab28663\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -6.81,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 6.811,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -20.00,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -50.00,\n          \"id\": 650,\n          \"title\": \"Discount for walk in\",\n          \"percentageAmount\": 25.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"3\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"4\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1634799600,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": [\n        {\n          \"id\": 3,\n          \"name\": \"10%\",\n          \"taxPercentageAmount\": 10.000,\n          \"taxFixedAmount\": 0.00,\n          \"maxTaxableAmount\": 0.00,\n          \"amount\": 11.20,\n          \"subtaxIds\": [],\n          \"tiers\": [],\n          \"enableOnToGo\": 0\n        }\n      ]\n    }\n  ],\n  \"paymentProviderType\": \"3\",\n  \"interiorTableId\": 85,\n  \"deliveryStatus\": \"0\",\n  \"overrideCustomerCreditLimit\": 0,\n  \"customAttributes\": [],\n  \"shippingAmount\": 0.0\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/sale/sync",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "sale",
+                "sync"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sale / Sync completed suspended sale with electronic payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": {{transactionId}},\n  \"status\": 1,\n  \"salesOutletId\":1,\n  \"customerId\": 9292,\n  \"timeCreated\": 1636975733,\n  \"deliveryMode\": \"1\",\n  \"employeeId\": 1,\n  \"salesEmployeeId\": 1,\n  \"isOfflineSale\": 0,\n  \"payment\": [\n    {\n      \"subOrderId\": 1,\n      \"paymentTenderId\": 25454,\n      \"tenderId\": 6,\n      \"amount\": 2.0,\n      \"surchargeAmount\": 0.0,\n      \"roundingAmount\": 0.0,\n      \"timeCreated\": 1636975340,\n      \"isEbtCash\": 0,\n      \"emv\": [],\n      \"name\": \"Cash\",\n      \"typeId\": 25\n    },\n    {\n      \"subOrderId\": 1,\n      \"tenderId\": 7,\n      \"amount\": 227.6900,\n      \"surchargeAmount\": 0.0,\n      \"roundingAmount\": 0.0,\n      \"referenceNumber\": \"6244811928399056\",\n      \"electronicTransactionId\": \"121925871\",\n      \"timeCreated\": 0,\n      \"status\": \"1\",\n      \"cardType\": \"Credit\",\n      \"entryMode\": \"Swiped\",\n      \"approvalCode\": \"000028\",\n      \"cardNumberMasked\": \"5413008000004111\",\n      \"isEbtCash\": 0,\n      \"emv\": [],\n      \"name\": \"Mastercard\",\n      \"typeId\": 26\n    }\n  ],\n  \"discounts\": [\n    {\n      \"amount\": 0.0,\n      \"id\": 645,\n      \"title\": \"Brand Walkin\",\n      \"percentageAmount\": 20.0,\n      \"fixedAmount\": 0.0,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"1\",\n      \"allocationMode\": 0,\n      \"timeFrom\": 0,\n      \"timeTo\": 0,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 0\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 650,\n      \"title\": \"Discount for walk in\",\n      \"percentageAmount\": 25.0,\n      \"fixedAmount\": 0.0,\n      \"typeId\": \"3\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"1\",\n      \"allocationMode\": 0,\n      \"timeFrom\": 0,\n      \"timeTo\": 0,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 0\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 142,\n      \"title\": \"$10 fixed universal manual\",\n      \"percentageAmount\": 0.0,\n      \"fixedAmount\": 11.0,\n      \"typeId\": \"10\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"2\",\n      \"allocationMode\": 0,\n      \"timeFrom\": 0,\n      \"timeTo\": 0,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 0\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 254,\n      \"title\": \"Brand Discount with Customer Type Filter\",\n      \"percentageAmount\": 0.0,\n      \"fixedAmount\": 20.0,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"1\",\n      \"allocationMode\": 0,\n      \"timeFrom\": 0,\n      \"timeTo\": 0,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 0\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 401,\n      \"title\": \"Brand\",\n      \"percentageAmount\": 25.0,\n      \"fixedAmount\": 0.0,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"1\",\n      \"allocationMode\": 0,\n      \"timeFrom\": 0,\n      \"timeTo\": 0,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 0\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 647,\n      \"title\": \"Customer type discount \",\n      \"percentageAmount\": 10.0,\n      \"fixedAmount\": 0.0,\n      \"typeId\": \"3\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"1\",\n      \"allocationMode\": 0,\n      \"timeFrom\": 0,\n      \"timeTo\": 0,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 0\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 254,\n      \"title\": \"Brand Discount with Customer Type Filter\",\n      \"percentageAmount\": 0.00,\n      \"fixedAmount\": 20.00,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"4\",\n      \"timeFrom\": 1532415600,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 401,\n      \"title\": \"Brand\",\n      \"percentageAmount\": 25.00,\n      \"fixedAmount\": 0.00,\n      \"typeId\": \"4\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"4\",\n      \"timeFrom\": 1571814000,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    },\n    {\n      \"amount\": 0.0,\n      \"id\": 647,\n      \"title\": \"Customer type discount \",\n      \"percentageAmount\": 10.00,\n      \"fixedAmount\": 0.00,\n      \"typeId\": \"3\",\n      \"systemTypeId\": \"1\",\n      \"applyMode\": \"4\",\n      \"allocationMode\": \"1\",\n      \"timeFrom\": 1634799600,\n      \"timeTo\": 9223372036854775807,\n      \"dailyTimeFrom\": 0,\n      \"dailyTimeTo\": 2359,\n      \"days\": [\n        0,\n        1,\n        2,\n        3,\n        4,\n        5,\n        6\n      ]\n    }\n  ],\n  \"products\": [\n    {\n      \"productId\": 393,\n      \"saleProductId\": 56444,\n      \"offlineId\": \"27b062ad-175f-469c-9144-7e9aee9954b7\",\n      \"quantity\": 1.0,\n      \"price\": 20.0,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 0,\n      \"addedTime\": 1636975160,\n      \"uniquenessHash\": \"8ee55fb3ed876595c7a0e74f42670985\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -0.68,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 0.681,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -2.00,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 12764,\n      \"saleProductId\": 56445,\n      \"quantity\": 1.0,\n      \"price\": 200.0,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 1,\n      \"addedTime\": 1636975158,\n      \"uniquenessHash\": \"27c723a28d672da85d7bffc63ab28663\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -6.81,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 6.811,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -20.00,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -50.00,\n          \"id\": 650,\n          \"title\": \"Discount for walk in\",\n          \"percentageAmount\": 25.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"3\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"4\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1634799600,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": [\n        {\n          \"id\": 3,\n          \"name\": \"10%\",\n          \"taxPercentageAmount\": 10.000,\n          \"taxFixedAmount\": 0.00,\n          \"maxTaxableAmount\": 0.00,\n          \"amount\": 11.20,\n          \"subtaxIds\": [],\n          \"tiers\": [],\n          \"enableOnToGo\": 0\n        }\n      ]\n    },\n    {\n      \"productId\": 8011,\n      \"saleProductId\": 56448,\n      \"quantity\": 1.0,\n      \"price\": 44.99,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 2,\n      \"addedTime\": 1636975211,\n      \"uniquenessHash\": \"f4a41f0f46ab11994d2dda68020dd424\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -1.53,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 1.532,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -4.50,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 3476,\n      \"saleProductId\": 56449,\n      \"quantity\": 1.0,\n      \"price\": 18.0,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 3,\n      \"addedTime\": 1636975210,\n      \"uniquenessHash\": \"704dac316a7ab3a2d94906265e0cfb3d\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -0.62,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 0.613,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -1.80,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    },\n    {\n      \"productId\": 3477,\n      \"saleProductId\": 56450,\n      \"quantity\": 1.0,\n      \"price\": 40.0,\n      \"totalForProduct\": 0.0,\n      \"totalTaxForProduct\": 0.0,\n      \"action\": \"sale\",\n      \"ebtAmount\": 0.0,\n      \"wicAmount\": 0.0,\n      \"ebtWicTaxAdjustment\": 0.0,\n      \"modifiersPrice\": 0.0,\n      \"totalDiscount\": 0.0,\n      \"isUMFractioned\": 0,\n      \"noTax\": 0,\n      \"divideMode\": \"0\",\n      \"printKitchenReciept\": 1,\n      \"loyaltyQuantity\": 0.0,\n      \"index\": 4,\n      \"addedTime\": 1636975209,\n      \"uniquenessHash\": \"0fa4fa57bd8637d5c595572ba9fb3ad4\",\n      \"surchargeAmount\": 0.0,\n      \"discounts\": [\n        {\n          \"amount\": -1.36,\n          \"id\": 142,\n          \"title\": \"$10 fixed universal manual\",\n          \"percentageAmount\": 0.00,\n          \"fixedAmount\": 1.362,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"2\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1519286400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        },\n        {\n          \"amount\": -4.00,\n          \"id\": 612,\n          \"title\": \"Discount new 08092021 test\",\n          \"percentageAmount\": 10.00,\n          \"fixedAmount\": 0.00,\n          \"typeId\": \"10\",\n          \"systemTypeId\": \"1\",\n          \"applyMode\": \"1\",\n          \"allocationMode\": \"1\",\n          \"timeFrom\": 1629788400,\n          \"timeTo\": 9223372036854775807,\n          \"dailyTimeFrom\": 0,\n          \"dailyTimeTo\": 2359,\n          \"days\": [\n            0,\n            1,\n            2,\n            3,\n            4,\n            5,\n            6\n          ]\n        }\n      ],\n      \"modifiers\": [],\n      \"tagalongProducts\": [],\n      \"discountsExclude\": [],\n      \"subOrders\": [\n        {\n          \"id\": 1\n        }\n      ],\n      \"taxes\": []\n    }\n  ],\n  \"paymentProviderType\": \"3\",\n  \"interiorTableId\": 85,\n  \"deliveryStatus\": \"0\",\n  \"overrideCustomerCreditLimit\": 0,\n  \"customAttributes\": [],\n  \"shippingAmount\": 0.0\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/sale/sync",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "sale",
+                "sync"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "GiftCard",
+      "item": [
+        {
+          "name": "GiftCard / Info",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"barcode\": \"1234567890\"\r\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/giftCard/info",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "giftCard",
+                "info"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GiftCard / Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"barcode\": \"123456789\",\r\n  \"balance\": 20\r\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/giftCard/create",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "giftCard",
+                "create"
+              ]
+            },
+            "description": "* **barcode** (numerical value, required) allows you to set the barcode for the gift card. \n* **balance** (numerical value, optional) allows you to specify the amount for the gift card.\n* **type**    (numerical value, optional, default value set to DEFAULT). Available types [0: DEFAULT, 1: MERCURY, 2: SHIFT4]"
+          },
+          "response": []
+        },
+        {
+          "name": "GiftCard / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"limit\": 20,\r\n  \"offset\": 0,\r\n  \"barcodes\": [\"1234567891\"],\r\n  \"types\": [\"0\"]\r\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/giftCard/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "giftCard",
+                "list"
+              ]
+            },
+            "description": "* **limit** (numerical value, 20 as default) allows you to set the number of objects returned in one page. \n* **offset** (numerical value, 0 as default) allows you to specify the ranking number of the first item on the page.\n* **barcodes** (array, optional) list of the specific barcodes, divided by comma\n* **types**   (array, optional) list of the available types [0: DEFAULT, 1: MERCURY, 2: SHIFT4], divided by comma"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "item": [
+        {
+          "name": "Product / View",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"productId\": \"1\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/view",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "view"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Notes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"productId\": \"8157\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/notes",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "notes"
+              ]
+            },
+            "description": "Returns list of notes by specific product.\n\n- **productId** Required. (numerical value) product unique identifier."
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Note Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"productId\": \"8157\",\n\t\"locale\": \"en\",\n\t\"title\": \"Note title sample\",\n\t\"text\": \"Note text sample\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/createNote",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "createNote"
+              ]
+            },
+            "description": "Create note for specific product.\n* **productId** Required. (numerical value) product unique identifier.\n* **locale** Required. (text value) note language, available values are ['en', 'fr', 'es', 'ru'].\n* **title** Required. (text value) short note title, maximum length 200 chars\n* **text** Required. (text value) note text, maximum length 4000 chars"
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Note Update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"noteId\": \"2\",\n\t\"title\": \"Note title updated sample\",\n\t\"text\": \"Note text updated sample\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/updateNote",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "updateNote"
+              ]
+            },
+            "description": "Update specific note.\n* **noteId** Required. (numerical value) note unique identifier.\n* **title** Required. (text value) short note title, maximum length 200 chars\n* **text** Required. (text value) note text, maximum length 4000 chars"
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Note Delete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"noteId\": \"2\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/deleteNote",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "deleteNote"
+              ]
+            },
+            "description": "Delete specific note\n* **noteId** Required. (numerical value) note unique identifier."
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Upload Images",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "productId",
+                  "type": "text",
+                  "value": "3613"
+                },
+                {
+                  "key": "images[0]",
+                  "type": "file",
+                  "value": null
+                },
+                {
+                  "key": "images[1]",
+                  "type": "file",
+                  "value": null
+                },
+                {
+                  "key": "images[2]",
+                  "type": "file",
+                  "value": null
+                },
+                {
+                  "key": "images[3]",
+                  "type": "file",
+                  "value": null
+                },
+                {
+                  "key": "images[4]",
+                  "type": "file",
+                  "value": null
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/uploadImages",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "uploadImages"
+              ]
+            },
+            "description": "Upload images for product.\nallowed extensions: jpg, jpeg, png\nmax files: 5\nmax file size: 10Mb"
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Delete Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "name": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"productId\": \"3613\",\n\t\"imageUid\": \"078fc1fa5003150b96f03631e9042576\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/deleteImage",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "deleteImage"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Brand List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{url}}/employee/product/brands",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "brands"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Category List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{url}}/employee/product/categories",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Vendor List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{url}}/employee/product/vendors",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "vendors"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Product / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"offset\": 0,\n\t\"limit\": 20,\n\t\"sort\": \"price\",\n\t\"order\": \"asc\",\n\t\"updated\": \"\",\n    \"warehouseIds\": [2, 676],\n    \"categoryIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "list"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Show out of stock products",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n\t\"offset\": 0,\n\t\"limit\": 100,\n    \"warehouseIds\": [2],\n    \"showOutOfStockQty\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{url}}/employee/product/list",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "employee",
+                    "product",
+                    "list"
+                  ]
+                }
+              },
+              "_postman_previewlanguage": "Text",
+              "header": null,
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "Product / Search By Barcode",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"barcode\": \"12345\",\n\t\"strict\": 1,\n\t\n\t\"offset\": 0,\n\t\"limit\": 30,\n\t\"sort\": \"price\",\n\t\"order\": \"desc\"\n\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/searchByBarcode",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "searchByBarcode"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Discount List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"salesOutletId\": 1\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/discounts",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "discounts"
+              ]
+            },
+            "description": "Get Discounts list"
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Coupon List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n\t\"limit\": 30,\n\t\"offset\": 0,\n\t\"status\": 1,\n\t\"discountId\": 15\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/coupons",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "coupons"
+              ]
+            },
+            "description": "Get Coupons list\n\n* **limit**      (numerical value, 30 as default) allows you to set the number of objects returned in one page.\n* **offset**     (numerical value, 0 as default) allows you to specify the ranking number of the first item on the page.\n* **status**     (optioanal, numerical value) - allows you to filter coupons according to theirs status (e.g. 1 - ACTIVE, 2 - INACTIVE, 3 - ALREADY_USED)\n* **discountId** (optioanal, numerical value) - allows you to filter coupons according to discount"
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Coupon",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"barcode\": \"5dd26088dc510\",\n  \"customerId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/coupon",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "coupon"
+              ]
+            },
+            "description": "Get Discount by coupon barcode"
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Tax List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/taxes",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "taxes"
+              ]
+            },
+            "description": "Get Tax list"
+          },
+          "response": []
+        },
+        {
+          "name": "Product / Discounted Price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"productId\": 1,\n\t\"salesOutletId\": 1\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/product/discountedPrice",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "product",
+                "discountedPrice"
+              ]
+            },
+            "description": "Product Discounted Price\n\n* **productId** - product ID\n* **salesOultetId** - sales outlet ID\n* **customerId** - customer ID (optional)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Misc",
+      "item": [
+        {
+          "name": "Dictionary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{url}}/employee/misc/dictionary",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "misc",
+                "dictionary"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tax",
+      "item": [
+        {
+          "name": "Tax / List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\" : \"20\",\n  \"offset\": \"0\",\n  \"type\": 1,\n  \"status\": 1,\n  \"ids\": [1, 2]\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/tax/list",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "tax",
+                "list"
+              ]
+            },
+            "description": "* **limit** (numerical value, 20 as default) allows you to set the number of objects returned in one page. \n* **offset** (numerical value, 0 as default) allows you to specify the ranking number of the first item on the page.\n* **type** (numerical value) - allows you to filter taxes according to theirs type (e.g. 1 - single, 2 - combo)\n* **status** (numerical value) - allows you to filter taxes according to theirs status (e.g. 1 - active, 2 - deleted)\n* **ids** (array) - list of the specific taxes divided by comma"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Warehouse",
+      "item": [
+        {
+          "name": "Warehouse / Change Quantity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{jwt}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"note\": \"#112233\",\n    \"products\": [\n        {\n            \"productId\": 1,\n            \"warehouseId\": 2,\n            \"measureUnitId\": 10,\n            \"quantity\": -10\n        },\n        {\n            \"productId\": 2,\n            \"warehouseId\": 2,\n            \"measureUnitId\": 10,\n            \"quantity\": -5\n        },\n        {\n            \"productId\": 3,\n            \"warehouseId\": 2,\n            \"measureUnitId\": 10,\n            \"quantity\": -5\n        }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{url}}/employee/warehouse/changeQuantity",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "employee",
+                "warehouse",
+                "changeQuantity"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
