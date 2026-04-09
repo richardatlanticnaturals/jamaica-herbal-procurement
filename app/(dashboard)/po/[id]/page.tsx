@@ -411,12 +411,12 @@ export default function PODetailPage() {
         throw new Error(data.error || "Failed to save changes");
       }
 
-      const data = await res.json();
-      setPo(data.po);
+      // Reload PO from GET endpoint which includes qtySold4mo enrichment
+      await loadPO();
       setEditing(false);
       setEditLineItems([]);
       setShowAddItem(false);
-      setChatOpen(false); // Close chat panel when leaving edit mode
+      setChatOpen(false);
     } catch (err: unknown) {
       setEditError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
