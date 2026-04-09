@@ -60,6 +60,7 @@ export default function InventoryPage() {
   const [editCostPrice, setEditCostPrice] = useState("");
   const [editRetailPrice, setEditRetailPrice] = useState("");
   const [editVendorId, setEditVendorId] = useState("");
+  const [editCategory, setEditCategory] = useState("");
   const [editIsActive, setEditIsActive] = useState(true);
 
   const loadItems = useCallback(async () => {
@@ -157,6 +158,7 @@ export default function InventoryPage() {
     setEditCostPrice(Number(item.costPrice).toFixed(2));
     setEditRetailPrice(Number(item.retailPrice).toFixed(2));
     setEditVendorId(item.vendorId || "none");
+    setEditCategory(item.category || "");
     setEditIsActive(item.isActive);
     setEditOpen(true);
   };
@@ -175,6 +177,7 @@ export default function InventoryPage() {
           costPrice: parseFloat(editCostPrice),
           retailPrice: parseFloat(editRetailPrice),
           vendorId: editVendorId === "none" ? null : editVendorId,
+          category: editCategory || null,
           isActive: editIsActive,
         }),
       });
@@ -467,6 +470,19 @@ export default function InventoryPage() {
                   onChange={(e) => setEditRetailPrice(e.target.value)}
                 />
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Category</Label>
+              <select
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="">Uncategorized</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
             <div className="grid gap-2">
               <Label>Vendor</Label>
