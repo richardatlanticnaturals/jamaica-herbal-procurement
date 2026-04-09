@@ -26,7 +26,9 @@ READS: No confirmation needed.
 SALES DATA: Use query_top_sellers for best sellers and query_slow_movers for items that haven't sold. Both use the local ProductSales cache (synced from Comcash). For real-time recent sales, use query_sales which calls the API directly. If sales cache is empty, tell user to sync sales first.
 STOCK LEVELS: When answering stock level questions, always call refresh_stock first to ensure data is current. Tell the user "Refreshing stock from POS..." before showing results.
 PO STATUSES: DRAFT (not sent), PENDING_APPROVAL (needs approval), APPROVED (ready to send), SENT (sent to vendor, awaiting delivery), CONFIRMED (vendor confirmed), PARTIALLY_RECEIVED (some items received), RECEIVED (all received), CANCELLED, CLOSED. When user says "pending POs", they mean active undelivered POs: use status SENT or query with no status filter and explain the breakdown.
-Categories: Herbs & Teas, Vitamins & Supplements, Essential Oils, Hair & Beauty, Body Care, Food & Beverages, Incense & Spiritual, Accessories.`;
+Categories: Herbs & Teas, Vitamins & Supplements, Essential Oils, Hair & Beauty, Body Care, Food & Beverages, Incense & Spiritual, Accessories.
+SMART POs: When asked to create a PO for a vendor (especially excluding slow movers), use create_smart_po. It handles everything server-side in one call. Do NOT manually query inventory then create a PO — use create_smart_po instead.
+PO STATUSES: DRAFT=new, APPROVED=ready to send, SENT=emailed to vendor, CONFIRMED=vendor confirmed, PARTIALLY_RECEIVED=some items arrived, RECEIVED=all arrived, CLOSED=completed.`;
 
 // --- Tool definitions for Claude ---
 const tools: Anthropic.Tool[] = [
@@ -162,6 +164,21 @@ const tools: Anthropic.Tool[] = [
     input_schema: {
       type: "object" as const,
       properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "create_smart_po",
+    description: "Create a PO for a specific vendor with all low-stock items, optionally excluding items that haven't sold in X months. Handles the entire flow server-side: finds low stock items, checks sales history, creates the PO. Use this instead of manually querying inventory then creating a PO.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        vendorName: { type: "string", description: "Vendor name to create PO for" },
+        vendorId: { type: "string", description: "Vendor ID (if known)" },
+        excludeSlowMonths: { type: "number", description: "Exclude items with no sales in this many months (default 0 = include all)" },
+        notes: { type: "string", description: "Optional notes for the PO" },
+        dryRun: { type: "boolean", description: "If true, show what would be ordered without creating. ALWAYS do dry run first." },
+      },
       required: [],
     },
   },
@@ -370,6 +387,7 @@ async function executeToolCall(
       case "query_sales": result = await handleQuerySales(input); break;
       case "create_purchase_order": result = await handleCreatePO(input); break;
       case "auto_generate_pos": result = await handleAutoGeneratePOs(); break;
+      case "create_smart_po": result = await handleCreateSmartPO(input); break;
       case "get_dashboard_stats": result = await handleDashboardStats(); break;
       case "sync_comcash_vendors": result = await handleSyncVendors(); break;
       case "sync_comcash_products": result = await handleSyncProducts(); break;
@@ -744,6 +762,156 @@ async function handleCreatePO(
     total: Number(po.total),
     lineItemCount: po.lineItems.length,
     message: `Created DRAFT PO ${po.poNumber} for ${po.vendor.name} with ${po.lineItems.length} items totaling $${Number(po.total).toFixed(2)}`,
+  });
+}
+
+async function handleCreateSmartPO(
+  input: Record<string, unknown>
+): Promise<string> {
+  const vendorName = (input.vendorName as string) || "";
+  const vendorId = (input.vendorId as string) || "";
+  const excludeSlowMonths = (input.excludeSlowMonths as number) || 0;
+  const notes = (input.notes as string) || "";
+  const dryRun = (input.dryRun as boolean) ?? true;
+
+  // Find vendor
+  let vendor = null;
+  if (vendorId) {
+    vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  } else if (vendorName) {
+    vendor = await prisma.vendor.findFirst({
+      where: { name: { contains: vendorName, mode: "insensitive" } },
+    });
+  }
+  if (!vendor) {
+    return JSON.stringify({ error: `Vendor "${vendorName || vendorId}" not found` });
+  }
+
+  // Get all low-stock items for this vendor
+  const allItems = await prisma.inventoryItem.findMany({
+    where: { vendorId: vendor.id, isActive: true },
+  });
+  const lowStockItems = allItems.filter(
+    (i) => i.currentStock <= i.reorderPoint
+  );
+
+  if (lowStockItems.length === 0) {
+    return JSON.stringify({ message: `${vendor.name} has no low-stock items.`, count: 0 });
+  }
+
+  // Optionally exclude slow movers
+  let itemsToOrder = lowStockItems;
+  let excluded: string[] = [];
+
+  if (excludeSlowMonths > 0) {
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - excludeSlowMonths);
+
+    // Get sales data for these items
+    const skus = lowStockItems.map((i) => i.sku);
+    const salesData = await prisma.productSales.findMany({
+      where: { sku: { in: skus } },
+      select: { sku: true, lastSoldAt: true, totalQtySold: true },
+    });
+    const salesMap = new Map(salesData.map((s) => [s.sku, s]));
+
+    itemsToOrder = lowStockItems.filter((item) => {
+      const sale = salesMap.get(item.sku);
+      if (!sale || !sale.lastSoldAt) {
+        // No sales record — consider it a slow mover, exclude
+        excluded.push(item.name);
+        return false;
+      }
+      if (sale.lastSoldAt < cutoff) {
+        // Last sold before cutoff — slow mover, exclude
+        excluded.push(item.name);
+        return false;
+      }
+      return true; // Active seller, include
+    });
+  }
+
+  if (itemsToOrder.length === 0) {
+    return JSON.stringify({
+      message: `All ${lowStockItems.length} low-stock items from ${vendor.name} are slow movers (no sales in ${excludeSlowMonths} months). Nothing to order.`,
+      excluded: excluded.length,
+    });
+  }
+
+  if (dryRun) {
+    const subtotal = itemsToOrder.reduce(
+      (sum, i) => sum + i.reorderQty * Number(i.costPrice), 0
+    );
+    return JSON.stringify({
+      dryRun: true,
+      vendor: vendor.name,
+      totalLowStock: lowStockItems.length,
+      excludedSlowMovers: excluded.length,
+      itemsToOrder: itemsToOrder.length,
+      subtotal: Math.round(subtotal * 100) / 100,
+      sampleItems: itemsToOrder.slice(0, 15).map((i) => ({
+        name: i.name,
+        stock: i.currentStock,
+        reorder: i.reorderQty,
+        cost: Number(i.costPrice),
+      })),
+      excludedSample: excluded.slice(0, 10),
+      message: `Ready to create PO for ${vendor.name}: ${itemsToOrder.length} items, ~$${subtotal.toFixed(2)}. ${excluded.length} slow movers excluded. Reply YES to create.`,
+    });
+  }
+
+  // Create the PO
+  const po = await prisma.$transaction(async (tx) => {
+    const settings = await tx.appSettings.upsert({
+      where: { id: "singleton" },
+      update: { nextPoSequence: { increment: 1 } },
+      create: { id: "singleton" },
+    });
+
+    const poNumber = `${settings.poNumberPrefix}-${new Date().getFullYear()}-${String(settings.nextPoSequence).padStart(4, "0")}`;
+
+    const lineItems = itemsToOrder.map((item) => ({
+      inventoryItemId: item.id,
+      vendorSku: item.vendorSku || null,
+      description: item.name,
+      qtyOrdered: item.reorderQty,
+      unitCost: Number(item.costPrice),
+      lineTotal: item.reorderQty * Number(item.costPrice),
+    }));
+
+    const subtotal = lineItems.reduce((sum, li) => sum + li.lineTotal, 0);
+
+    return await tx.purchaseOrder.create({
+      data: {
+        poNumber,
+        vendorId: vendor!.id,
+        status: "DRAFT",
+        subtotal,
+        total: subtotal,
+        orderMethod: "EMAIL",
+        notes: notes || `Smart PO: ${excluded.length} slow movers excluded`,
+        createdBy: "ai-chat",
+        lineItems: { create: lineItems },
+        statusHistory: {
+          create: {
+            toStatus: "DRAFT",
+            note: `Created via AI Chat: ${itemsToOrder.length} items, ${excluded.length} slow movers excluded`,
+            triggeredBy: "ai-chat",
+          },
+        },
+      },
+      include: { vendor: { select: { name: true } }, lineItems: true },
+    });
+  });
+
+  return JSON.stringify({
+    success: true,
+    poNumber: po.poNumber,
+    vendor: po.vendor.name,
+    items: po.lineItems.length,
+    total: Number(po.total),
+    excludedSlowMovers: excluded.length,
+    message: `Created DRAFT PO ${po.poNumber} for ${po.vendor.name}: ${po.lineItems.length} items, $${Number(po.total).toFixed(2)}. ${excluded.length} slow movers excluded.`,
   });
 }
 
