@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Link from "next/link";
 import {
   ArrowLeft,
   Mail,
@@ -253,7 +254,7 @@ export default function VendorDetailPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Total Spent</p>
-              <p className="text-xl font-bold">${stats.totalSpent.toFixed(2)}</p>
+              <p className="text-xl font-bold">${(Number(stats.totalSpent) || 0).toFixed(2)}</p>
             </div>
           </CardContent>
         </Card>
@@ -437,9 +438,11 @@ export default function VendorDetailPage() {
               </TableHeader>
               <TableBody>
                 {pos.map((po) => (
-                  <TableRow key={po.id}>
+                  <TableRow key={po.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell className="font-mono text-xs font-medium">
-                      {po.poNumber}
+                      <Link href={`/po/${po.id}`} className="text-blue-600 hover:underline">
+                        {po.poNumber}
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <Badge

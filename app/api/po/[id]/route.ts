@@ -50,6 +50,12 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
+    // Fix: Check if PO exists before updating to return proper 404
+    const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
+    }
+
     const po = await prisma.purchaseOrder.update({
       where: { id },
       data: {

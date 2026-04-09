@@ -168,6 +168,8 @@ export default function InventoryPage() {
         setPage(1);
         setSearch("");
         setSearchInput("");
+        // Refresh inventory list after successful import
+        loadItems();
       } else {
         setImportResult(`Error: ${data.error}`);
       }

@@ -16,32 +16,72 @@ export async function GET(request: NextRequest) {
     const vendorId = searchParams.get("vendorId") || "";
     const category = searchParams.get("category") || "";
 
+    // Fix: Use AND array to combine category OR and search OR without overwriting
     const where: any = { isActive: true };
+    const andConditions: any[] = [];
 
     // Filter by vendor if provided
     if (vendorId) {
       where.vendorId = vendorId;
     }
 
-    // Filter by category
+    // Filter by category — pushed into AND to avoid OR conflict with search
     if (category === "__uncategorized") {
-      where.OR = [...(where.OR || []), { category: null }, { category: "" }];
+      andConditions.push({ OR: [{ category: null }, { category: "" }] });
     } else if (category) {
       where.category = { equals: category, mode: "insensitive" };
     }
 
+    // Search — pushed into AND to avoid OR conflict with category filter
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { sku: { contains: search, mode: "insensitive" } },
-        { category: { contains: search, mode: "insensitive" } },
-      ];
+      andConditions.push({
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { sku: { contains: search, mode: "insensitive" } },
+          { category: { contains: search, mode: "insensitive" } },
+        ],
+      });
     }
 
-    if (filter === "low-stock") {
-      where.currentStock = { gt: 0, lte: 5 };
+    // For low-stock, we need field-to-field comparison (currentStock <= reorderPoint)
+    // which Prisma doesn't support. We fetch stock > 0 and post-filter.
+    const isLowStockFilter = filter === "low-stock";
+
+    if (isLowStockFilter) {
+      where.currentStock = { gt: 0 };
     } else if (filter === "out-of-stock") {
       where.currentStock = { lte: 0 };
+    }
+
+    // Combine AND conditions if any exist
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
+
+    if (isLowStockFilter) {
+      // Fetch all matching items with stock > 0, then post-filter by reorderPoint
+      const allItems = await prisma.inventoryItem.findMany({
+        where,
+        orderBy: { name: "asc" },
+        include: {
+          vendor: { select: { id: true, name: true } },
+        },
+      });
+
+      // Application-level filter: stock > 0 AND stock <= reorderPoint
+      const lowStockItems = allItems.filter(
+        (item) => item.currentStock > 0 && item.currentStock <= item.reorderPoint
+      );
+
+      const total = lowStockItems.length;
+      const paginatedItems = lowStockItems.slice((page - 1) * limit, page * limit);
+
+      return NextResponse.json({
+        items: paginatedItems,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+      });
     }
 
     const [items, total] = await Promise.all([

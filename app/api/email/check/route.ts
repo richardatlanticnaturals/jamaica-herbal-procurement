@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/api-auth";
 
 /**
  * POST /api/email/check
@@ -19,6 +20,10 @@ import { NextResponse } from "next/server";
  * with { subject, body, from, messageId }.
  */
 export async function POST() {
+  // Fix: Add missing requireAuth() — endpoint was unprotected
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   // TODO: Implement Gmail polling
   // Steps to implement:
   // 1. Read gmailRefreshToken from AppSettings

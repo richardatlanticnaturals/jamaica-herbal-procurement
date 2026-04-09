@@ -328,7 +328,6 @@ export default function AlertsPage() {
                   key={alert.id}
                   alert={alert}
                   onDismiss={() => handleDismiss(alert.id)}
-                  onFindAlternatives={handleFindAlternatives}
                 />
               ))}
             </div>
@@ -437,11 +436,9 @@ function SummaryCard({
 function AlertCard({
   alert,
   onDismiss,
-  onFindAlternatives,
 }: {
   alert: AlertItem;
   onDismiss: () => void;
-  onFindAlternatives: (inventoryItemId: string) => void;
 }) {
   const config = severityConfig[alert.severity] || severityConfig.blue;
   const Icon = config.icon;
@@ -481,15 +478,16 @@ function AlertCard({
                 </Button>
               </Link>
               {alert.type === "oos" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => onFindAlternatives(alert.poId)}
-                >
-                  <Sparkles className="mr-1 h-3 w-3" />
-                  Find Alternative
-                </Button>
+                <Link href="/alerts?tab=oos">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                  >
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    View OOS Items
+                  </Button>
+                </Link>
               )}
               <Button
                 variant="ghost"

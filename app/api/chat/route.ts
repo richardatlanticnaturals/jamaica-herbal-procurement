@@ -976,7 +976,7 @@ async function handleSyncProducts(): Promise<string> {
         let onHand = 0;
         if (Array.isArray(product.onHand)) {
           onHand = product.onHand.reduce(
-            (sum: number, wh: any) => sum + parseFloat(wh.quantity || "0"), 0
+            (sum, wh) => sum + parseFloat(wh.quantity || "0"), 0
           );
         } else if (typeof product.onHand === "number") {
           onHand = product.onHand;
@@ -1595,7 +1595,7 @@ export async function POST(request: NextRequest) {
 
       // Check if response contains tool_use blocks
       const toolUseBlocks = response.content.filter(
-        (block): block is Anthropic.ContentBlock & { type: "tool_use" } =>
+        (block): block is Anthropic.ToolUseBlock =>
           block.type === "tool_use"
       );
 

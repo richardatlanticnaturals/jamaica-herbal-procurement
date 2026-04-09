@@ -54,8 +54,7 @@ export async function POST() {
           let onHand = 0;
           if (Array.isArray(product.onHand)) {
             onHand = product.onHand.reduce(
-              (sum: number, wh: { quantity?: string }) =>
-                sum + parseFloat(wh.quantity || "0"),
+              (sum, wh) => sum + parseFloat(wh.quantity || "0"),
               0
             );
           } else if (typeof product.onHand === "number") {

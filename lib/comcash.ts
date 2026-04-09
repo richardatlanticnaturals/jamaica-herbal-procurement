@@ -54,7 +54,9 @@ export interface ComcashProduct {
   isScale?: number;
   size?: string;
   skuCodes?: string[];
-  onHand?: number;
+  // onHand can be a number OR an array of {warehouseId, quantity} objects
+  // depending on whether warehouseIds were passed in the request
+  onHand?: number | Array<{ warehouseId?: number; quantity?: string }>;
   customAttributes?: unknown[];
   modifierGroupIds?: number[];
   vendorProductIds?: unknown[];
@@ -167,6 +169,7 @@ async function employeeApiRequest<T>(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      OPEN_API_KEY: COMCASH_OPENAPI_KEY,
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(body),

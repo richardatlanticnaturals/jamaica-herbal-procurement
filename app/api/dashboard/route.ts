@@ -99,13 +99,14 @@ export async function GET(request: NextRequest) {
 
       // PO spending grouped by day for the chart
       // Only include actionable statuses (not DRAFT or CANCELLED)
+      // Fix: Use MAKE_INTERVAL instead of string concat for safe parameterized interval
       prisma.$queryRaw<{ date: string; total: string }[]>`
         SELECT
           TO_CHAR("createdAt"::date, 'YYYY-MM-DD') as date,
           SUM("total")::text as total
         FROM "PurchaseOrder"
         WHERE "status" IN ('SENT', 'CONFIRMED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CLOSED')
-          AND "createdAt" >= NOW() - (${days} || ' days')::interval
+          AND "createdAt" >= NOW() - MAKE_INTERVAL(days => ${days})
         GROUP BY "createdAt"::date
         ORDER BY "createdAt"::date ASC
       `,

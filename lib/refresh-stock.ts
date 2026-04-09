@@ -28,9 +28,9 @@ export interface RefreshStockResult {
  */
 function sumOnHand(product: ComcashProduct): number {
   if (Array.isArray(product.onHand)) {
-    // onHand is [{warehouseId, quantity}] — sum all
+    // onHand is [{warehouseId, quantity}] — sum all warehouse quantities
     return Math.round(
-      (product.onHand as Array<{ warehouseId?: number; quantity?: string }>).reduce(
+      product.onHand.reduce(
         (sum, wh) => sum + parseFloat(wh.quantity || "0"),
         0
       )

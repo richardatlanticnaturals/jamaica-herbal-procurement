@@ -207,8 +207,8 @@ export default function NewPurchaseOrderPage() {
       const data = await res.json();
       // Redirect to the new PO detail page
       router.push(`/po/${data.po.id}`);
-    } catch (err: any) {
-      setError(err.message || "Failed to create purchase order");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create purchase order");
     } finally {
       setSubmitting(false);
     }

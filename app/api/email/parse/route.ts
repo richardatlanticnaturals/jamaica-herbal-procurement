@@ -249,8 +249,9 @@ async function markOutOfStockItems(
   for (const lineItem of lineItems) {
     const itemName = lineItem.description.toLowerCase();
     const itemSku = lineItem.vendorSku?.toLowerCase() || "";
-    const inventoryName = lineItem.inventoryItem.name.toLowerCase();
-    const inventorySku = lineItem.inventoryItem.sku.toLowerCase();
+    // Fix: Guard against null inventoryItem to prevent null reference crash
+    const inventoryName = lineItem.inventoryItem?.name?.toLowerCase() || "";
+    const inventorySku = lineItem.inventoryItem?.sku?.toLowerCase() || "";
 
     const isOos = oosItemNames.some((oosName) => {
       const oosLower = oosName.toLowerCase();
