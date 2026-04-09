@@ -649,7 +649,7 @@ async function handleSearchSales(
 ): Promise<string> {
   const productSearch = ((input.productSearch as string) || "").toLowerCase().trim();
   const days = (input.days as number) || 7;
-  const maxSales = Math.min((input.limit as number) || 500, 500);
+  const maxSales = Math.min((input.limit as number) || 5000, 5000);
 
   try {
     const token = await authenticateEmployee();
