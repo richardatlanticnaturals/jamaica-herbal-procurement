@@ -23,7 +23,12 @@ const SYSTEM_PROMPT = `Jamaica Herbal procurement assistant. Two stores: Lauderd
 Be concise. Use markdown tables. Format money as $X.XX.
 WRITES: Always dry run first, show summary, ask "Ready to apply? yes/no", only apply after confirmation. After applying, sync to Comcash.
 READS: No confirmation needed.
-SALES DATA: Use query_top_sellers for best sellers and query_slow_movers for items that haven't sold. Both use the local ProductSales cache (synced from Comcash). For real-time recent sales, use query_sales which calls the API directly. If sales cache is empty, tell user to sync sales first.
+SALES DATA:
+- For product-specific sales questions ("how many patties sold?", "turmeric sales this week"), use search_sales with the product name and days parameter. It paginates through up to 500 live sales and returns aggregated data with daily breakdowns.
+- For "top sellers" or "best sellers", use query_top_sellers. Pass days param to filter by time period (e.g. days=7 for "this week", days=30 for "this month").
+- For "how is X selling?" or product deep-dives, use query_product_history for a complete product profile including stock, pricing, vendor, and sales history.
+- For items that haven't sold, use query_slow_movers (uses ProductSales cache).
+- NEVER say "I don't have access to sales data" — always try search_sales first.
 STOCK LEVELS: When answering stock level questions, always call refresh_stock first to ensure data is current. Tell the user "Refreshing stock from POS..." before showing results.
 PO STATUSES: DRAFT (not sent), PENDING_APPROVAL (needs approval), APPROVED (ready to send), SENT (sent to vendor, awaiting delivery), CONFIRMED (vendor confirmed), PARTIALLY_RECEIVED (some items received), RECEIVED (all received), CANCELLED, CLOSED. When user says "pending POs", they mean active undelivered POs: use status SENT or query with no status filter and explain the breakdown.
 Categories: Herbs & Teas, Vitamins & Supplements, Essential Oils, Hair & Beauty, Body Care, Food & Beverages, Incense & Spiritual, Accessories.
@@ -95,25 +100,23 @@ const tools: Anthropic.Tool[] = [
     },
   },
   {
-    name: "query_sales",
+    name: "search_sales",
     description:
-      "Fetch sales data from the Comcash POS system. Can filter by time range. Returns sale transactions with products, customers, and payment info.",
+      "Search sales data from Comcash POS by product name/keyword. Paginates through up to 500 recent sales, filters server-side, and returns aggregated totals with daily breakdown. Use this for questions like 'how many patties sold this week' or 'turmeric sales last 30 days'.",
     input_schema: {
       type: "object" as const,
       properties: {
+        productSearch: {
+          type: "string",
+          description: "Product name or keyword to search for (case-insensitive partial match). E.g. 'patt' matches 'Jamaican Patty', 'Beef Patty', etc.",
+        },
+        days: {
+          type: "number",
+          description: "Number of days to look back (default 7). E.g. 7 for last week, 30 for last month, 90 for last quarter.",
+        },
         limit: {
           type: "number",
-          description: "Max number of sales to return (default 50)",
-        },
-        timeFrom: {
-          type: "string",
-          description:
-            "Start of time range as ISO date string (e.g. 2024-01-01)",
-        },
-        timeTo: {
-          type: "string",
-          description:
-            "End of time range as ISO date string (e.g. 2024-12-31)",
+          description: "Max number of sales to paginate through (default 500, max 500). Higher = more complete but slower.",
         },
       },
       required: [],
@@ -327,7 +330,7 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: "query_top_sellers",
-    description: "Get top-selling products from the ProductSales cache. Sort by quantity sold or revenue. Can filter by vendor, category, or date range.",
+    description: "Get top-selling products. Uses ProductSales cache for all-time data, or paginates live Comcash API when a specific time period is requested via 'days' parameter. Use days=7 for 'this week', days=30 for 'this month'.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -335,9 +338,21 @@ const tools: Anthropic.Tool[] = [
         vendorId: { type: "string", description: "Filter by vendor ID" },
         vendorName: { type: "string", description: "Filter by vendor name (searches)" },
         category: { type: "string", description: "Filter by inventory category" },
+        days: { type: "number", description: "Only count sales from the last N days. If omitted, uses all-time cache data. Use 7 for 'this week', 30 for 'this month'." },
         limit: { type: "number", description: "Max results (default 20)" },
       },
       required: [],
+    },
+  },
+  {
+    name: "query_product_history",
+    description: "Get a complete product profile: current stock, reorder point, cost/retail price, category, vendor, total qty sold (from cache), and daily sales for last 30 days from live API. Use for 'how is X selling?' or product deep-dives.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        productName: { type: "string", description: "Product name to look up (partial match)" },
+      },
+      required: ["productName"],
     },
   },
   {
@@ -355,12 +370,37 @@ const tools: Anthropic.Tool[] = [
 // --- Tool execution handlers ---
 
 // Safety cap: truncate tool results to prevent token explosions
-const MAX_TOOL_RESULT_CHARS = 4000;
-function capResult(json: string): string {
+// Aggregated results (search_sales, query_product_history, query_top_sellers) are already
+// compact so we use a higher limit and smarter truncation.
+const MAX_TOOL_RESULT_CHARS = 6000;
+function capResult(json: string, toolName?: string): string {
   if (!json || json.length <= MAX_TOOL_RESULT_CHARS) return json || "{}";
   // Try to parse and limit array items
   try {
     const obj = JSON.parse(json);
+    // Sales aggregation tools return pre-aggregated data — only trim dailyBreakdown
+    // and matchedProducts, not the summary fields
+    if (toolName === "search_sales" || toolName === "query_product_history" || toolName === "query_top_sellers") {
+      // Trim daily breakdown to 30 max entries
+      if (Array.isArray(obj.dailyBreakdown) && obj.dailyBreakdown.length > 30) {
+        obj.dailyBreakdown = obj.dailyBreakdown.slice(0, 30);
+        obj.dailyBreakdown_note = "Showing last 30 days";
+      }
+      // Trim matched products to 25 max
+      if (Array.isArray(obj.matchedProducts) && obj.matchedProducts.length > 25) {
+        const total = obj.matchedProducts.length;
+        obj.matchedProducts = obj.matchedProducts.slice(0, 25);
+        obj.matchedProducts_note = `Showing top 25 of ${total}`;
+      }
+      if (Array.isArray(obj.items) && obj.items.length > 25) {
+        const total = obj.items.length;
+        obj.items = obj.items.slice(0, 25);
+        obj.items_note = `Showing top 25 of ${total}`;
+      }
+      const trimmed = JSON.stringify(obj);
+      if (trimmed.length <= MAX_TOOL_RESULT_CHARS) return trimmed;
+    }
+    // Default truncation for other tools
     for (const key of Object.keys(obj)) {
       if (Array.isArray(obj[key]) && obj[key].length > 10) {
         const total = obj[key].length;
@@ -395,7 +435,7 @@ async function executeToolCall(
       case "query_inventory": result = await handleQueryInventory(input); break;
       case "query_purchase_orders": result = await handleQueryPurchaseOrders(input); break;
       case "query_vendors": result = await handleQueryVendors(input); break;
-      case "query_sales": result = await handleQuerySales(input); break;
+      case "search_sales": result = await handleSearchSales(input); break;
       case "create_purchase_order": result = await handleCreatePO(input); break;
       case "auto_generate_pos": result = await handleAutoGeneratePOs(input); break;
       case "create_smart_po": result = await handleCreateSmartPO(input); break;
@@ -407,11 +447,13 @@ async function executeToolCall(
       case "sync_inventory_to_comcash": result = await handleSyncInventoryToComcash(input); break;
       case "query_slow_movers": result = await handleQuerySlowMovers(input); break;
       case "query_top_sellers": result = await handleQueryTopSellers(input); break;
+      case "query_product_history": result = await handleQueryProductHistory(input); break;
       case "refresh_stock": result = await handleRefreshStock(); break;
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
-    return capResult(result);
+    // Pass tool name so capResult can use smarter truncation for aggregated tools
+    return capResult(result, name);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     console.error(`[Chat Tool Error] ${name}:`, msg);
@@ -596,108 +638,306 @@ async function handleQueryVendors(
   return JSON.stringify({ vendors: result, count: result.length });
 }
 
-async function handleQuerySales(
+// --- search_sales: paginate through live Comcash sales, filter by product name, aggregate results ---
+async function handleSearchSales(
   input: Record<string, unknown>
 ): Promise<string> {
-  const limit = (input.limit as number) || 20;
-  const timeFrom = (input.timeFrom as string) || "";
-  const timeTo = (input.timeTo as string) || "";
+  const productSearch = ((input.productSearch as string) || "").toLowerCase().trim();
+  const days = (input.days as number) || 7;
+  const maxSales = Math.min((input.limit as number) || 500, 500);
 
-  // --- Check ProductSales cache for aggregate data first ---
-  try {
-    const cachedCount = await prisma.productSales.count();
-    if (cachedCount > 0 && !timeFrom && !timeTo) {
-      // Return aggregate summary from cache instead of hitting API
-      const topByQty = await prisma.productSales.findMany({
-        orderBy: { totalQtySold: "desc" },
-        take: Math.min(limit, 20),
-        include: {
-          inventoryItem: {
-            select: { vendor: { select: { name: true } }, category: true },
-          },
-        },
-      });
-
-      const summary = topByQty.map((ps) => ({
-        name: ps.productName,
-        sku: ps.sku,
-        qtySold: ps.totalQtySold,
-        revenue: Number(ps.totalRevenue),
-        lastSold: ps.lastSoldAt
-          ? ps.lastSoldAt.toISOString().split("T")[0]
-          : "never",
-        transactions: ps.salesCount,
-        vendor: ps.inventoryItem?.vendor?.name || "--",
-        category: ps.inventoryItem?.category || "--",
-      }));
-
-      return JSON.stringify({
-        source: "cache",
-        sales: summary,
-        count: summary.length,
-        totalCachedProducts: cachedCount,
-        note: "Showing aggregated data from ProductSales cache. Use sync-sales to refresh. Pass timeFrom/timeTo to fetch real-time from Comcash API.",
-      });
-    }
-  } catch {
-    // Cache query failed — fall through to live API
-  }
-
-  // --- Fall through to live Comcash API for real-time or filtered queries ---
   try {
     const token = await authenticateEmployee();
 
+    // Calculate cutoff date (unix seconds)
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    const cutoffUnix = Math.floor(cutoffDate.getTime() / 1000);
+
+    // Paginate through sales — 100 per page, up to maxSales
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body: any = {
-      offset: 0,
-      limit,
-    };
+    const allSales: any[] = [];
+    let offset = 0;
+    const pageSize = 100;
+    let keepFetching = true;
 
-    if (timeFrom) body.timeFrom = timeFrom;
-    if (timeTo) body.timeTo = timeTo;
-
-    // Use V2 /sale/list (employee endpoint returns empty)
-    const res = await fetch(`${COMCASH_OPENAPI_URL}/sale/list`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        OPEN_API_KEY: COMCASH_OPENAPI_KEY,
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      return JSON.stringify({
-        error: `Comcash sales API returned ${res.status}: ${text.slice(0, 200)}`,
+    while (keepFetching && allSales.length < maxSales) {
+      const res = await fetch(`${COMCASH_OPENAPI_URL}/sale/list`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          OPEN_API_KEY: COMCASH_OPENAPI_KEY,
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ limit: pageSize, offset, order: "desc" }),
       });
+
+      if (!res.ok) {
+        const text = await res.text();
+        return JSON.stringify({ error: `Comcash API ${res.status}: ${text.slice(0, 200)}` });
+      }
+
+      const rawData = await res.json();
+      const batch = Array.isArray(rawData) ? rawData : rawData.data || [];
+
+      if (batch.length === 0) {
+        keepFetching = false;
+        break;
+      }
+
+      // Check if we've gone past the cutoff date
+      for (const sale of batch) {
+        const saleTime = sale.timeCreated || 0;
+        if (saleTime < cutoffUnix) {
+          // This sale is older than our window — stop fetching
+          keepFetching = false;
+          break;
+        }
+        allSales.push(sale);
+        if (allSales.length >= maxSales) {
+          keepFetching = false;
+          break;
+        }
+      }
+
+      offset += batch.length;
+
+      // If batch was smaller than page size, no more data
+      if (batch.length < pageSize) {
+        keepFetching = false;
+      }
     }
 
-    const rawData = await res.json();
-    const salesArr = Array.isArray(rawData) ? rawData : rawData.data || [];
+    // Aggregate by product — filter by productSearch if provided
+    const productAgg: Record<string, {
+      name: string;
+      totalQty: number;
+      totalRevenue: number;
+      transactions: number;
+      dailyMap: Record<string, { qty: number; revenue: number }>;
+    }> = {};
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sales = salesArr.slice(0, Math.min(limit, 20)).map((s: any) => ({
-      id: s.id,
-      date: s.timeCreated ? new Date(s.timeCreated * 1000).toISOString().split("T")[0] : "",
-      total: s.payment?.totalPayedAmount || "0",
-      customer: s.customer ? `${s.customer.firstName || ""} ${s.customer.lastName || ""}`.trim() : "Walk-in",
-      employee: s.employeeId,
+    let totalTransactions = 0;
+    let totalRevenue = 0;
+
+    for (const sale of allSales) {
+      const saleDate = sale.timeCreated
+        ? new Date(sale.timeCreated * 1000).toISOString().split("T")[0]
+        : "unknown";
+      const products = sale.products || [];
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      items: (s.products || []).map((p: any) => ({
-        name: p.title,
-        qty: p.quantity,
-        price: p.totalForProduct,
-      })),
-    }));
+      for (const p of products as any[]) {
+        const title = (p.title || "").trim();
+        const titleLower = title.toLowerCase();
 
-    return JSON.stringify({ source: "live_api", sales, count: salesArr.length });
+        // If productSearch is provided, filter
+        if (productSearch && !titleLower.includes(productSearch)) continue;
+
+        const qty = parseFloat(p.quantity || "0") || 0;
+        const revenue = parseFloat(p.totalForProduct || "0") || 0;
+
+        if (!productAgg[titleLower]) {
+          productAgg[titleLower] = {
+            name: title,
+            totalQty: 0,
+            totalRevenue: 0,
+            transactions: 0,
+            dailyMap: {},
+          };
+        }
+
+        const agg = productAgg[titleLower];
+        agg.totalQty += qty;
+        agg.totalRevenue += revenue;
+        agg.transactions += 1;
+
+        if (!agg.dailyMap[saleDate]) {
+          agg.dailyMap[saleDate] = { qty: 0, revenue: 0 };
+        }
+        agg.dailyMap[saleDate].qty += qty;
+        agg.dailyMap[saleDate].revenue += revenue;
+      }
+
+      totalTransactions++;
+      totalRevenue += parseFloat(sale.payment?.totalPayedAmount || "0") || 0;
+    }
+
+    // Convert aggregations to sorted arrays
+    const matchedProducts = Object.values(productAgg)
+      .sort((a, b) => b.totalQty - a.totalQty)
+      .map((p) => ({
+        name: p.name,
+        totalQty: Math.round(p.totalQty * 100) / 100,
+        totalRevenue: Math.round(p.totalRevenue * 100) / 100,
+        transactions: p.transactions,
+        dailyBreakdown: Object.entries(p.dailyMap)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([date, data]) => ({
+            date,
+            qty: Math.round(data.qty * 100) / 100,
+            revenue: Math.round(data.revenue * 100) / 100,
+          })),
+      }));
+
+    return JSON.stringify({
+      source: "live_api",
+      searchTerm: productSearch || "(all products)",
+      daysSearched: days,
+      salesScanned: allSales.length,
+      totalTransactions,
+      matchedProducts,
+      matchedProductCount: matchedProducts.length,
+      overallTotalQty: Math.round(matchedProducts.reduce((s, p) => s + p.totalQty, 0) * 100) / 100,
+      overallTotalRevenue: Math.round(matchedProducts.reduce((s, p) => s + p.totalRevenue, 0) * 100) / 100,
+    });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
-    return JSON.stringify({
-      error: `Failed to fetch sales: ${msg}`,
+    return JSON.stringify({ error: `Failed to search sales: ${msg}` });
+  }
+}
+
+// --- query_product_history: complete product profile with stock, pricing, vendor, sales ---
+async function handleQueryProductHistory(
+  input: Record<string, unknown>
+): Promise<string> {
+  const productName = ((input.productName as string) || "").trim();
+
+  if (!productName) {
+    return JSON.stringify({ error: "productName is required" });
+  }
+
+  try {
+    // Find matching inventory items
+    const items = await prisma.inventoryItem.findMany({
+      where: {
+        name: { contains: productName, mode: "insensitive" },
+        isActive: true,
+      },
+      take: 5,
+      include: {
+        vendor: { select: { id: true, name: true } },
+      },
     });
+
+    if (items.length === 0) {
+      return JSON.stringify({ error: `No products found matching "${productName}"`, items: [] });
+    }
+
+    // Get ProductSales cache data for these items
+    const skus = items.map((i) => i.sku);
+    const cachedSales = await prisma.productSales.findMany({
+      where: { sku: { in: skus } },
+    });
+    const salesBySku = new Map(cachedSales.map((s) => [s.sku, s]));
+
+    // Get daily sales from live API for last 30 days
+    const token = await authenticateEmployee();
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 30);
+    const cutoffUnix = Math.floor(cutoffDate.getTime() / 1000);
+
+    // Paginate through sales to find matches
+    const dailyMap: Record<string, { qty: number; revenue: number }> = {};
+    let offset = 0;
+    let keepFetching = true;
+    let recentQty = 0;
+    let recentRevenue = 0;
+
+    const searchLower = productName.toLowerCase();
+
+    while (keepFetching && offset < 500) {
+      const res = await fetch(`${COMCASH_OPENAPI_URL}/sale/list`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          OPEN_API_KEY: COMCASH_OPENAPI_KEY,
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ limit: 100, offset, order: "desc" }),
+      });
+
+      if (!res.ok) break;
+
+      const rawData = await res.json();
+      const batch = Array.isArray(rawData) ? rawData : rawData.data || [];
+      if (batch.length === 0) break;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const sale of batch as any[]) {
+        const saleTime = sale.timeCreated || 0;
+        if (saleTime < cutoffUnix) {
+          keepFetching = false;
+          break;
+        }
+
+        const saleDate = new Date(saleTime * 1000).toISOString().split("T")[0];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const p of (sale.products || []) as any[]) {
+          const title = (p.title || "").toLowerCase();
+          if (!title.includes(searchLower)) continue;
+
+          const qty = parseFloat(p.quantity || "0") || 0;
+          const revenue = parseFloat(p.totalForProduct || "0") || 0;
+
+          recentQty += qty;
+          recentRevenue += revenue;
+
+          if (!dailyMap[saleDate]) {
+            dailyMap[saleDate] = { qty: 0, revenue: 0 };
+          }
+          dailyMap[saleDate].qty += qty;
+          dailyMap[saleDate].revenue += revenue;
+        }
+      }
+
+      offset += batch.length;
+      if (batch.length < 100) keepFetching = false;
+    }
+
+    const dailyBreakdown = Object.entries(dailyMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => ({
+        date,
+        qty: Math.round(data.qty * 100) / 100,
+        revenue: Math.round(data.revenue * 100) / 100,
+      }));
+
+    // Build product profiles
+    const profiles = items.map((item) => {
+      const cached = salesBySku.get(item.sku);
+      return {
+        name: item.name,
+        sku: item.sku,
+        currentStock: item.currentStock,
+        reorderPoint: item.reorderPoint,
+        reorderQty: item.reorderQty,
+        costPrice: Number(item.costPrice),
+        retailPrice: Number(item.retailPrice),
+        category: item.category || "--",
+        vendor: item.vendor?.name || "--",
+        vendorId: item.vendorId || "--",
+        // From cache (all-time)
+        allTimeQtySold: cached?.totalQtySold ?? 0,
+        allTimeRevenue: cached ? Number(cached.totalRevenue) : 0,
+        allTimeSalesCount: cached?.salesCount ?? 0,
+        lastSoldAt: cached?.lastSoldAt ? cached.lastSoldAt.toISOString().split("T")[0] : "never",
+      };
+    });
+
+    return JSON.stringify({
+      source: "combined",
+      products: profiles,
+      last30Days: {
+        qtySold: Math.round(recentQty * 100) / 100,
+        revenue: Math.round(recentRevenue * 100) / 100,
+        dailyBreakdown,
+      },
+      salesScanned: offset,
+    });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    return JSON.stringify({ error: `Failed to get product history: ${msg}` });
   }
 }
 
@@ -1425,7 +1665,7 @@ async function handleQuerySlowMovers(
   }
 }
 
-// --- query_top_sellers: aggregated top sellers from ProductSales cache ---
+// --- query_top_sellers: aggregated top sellers — from cache or live API if days specified ---
 async function handleQueryTopSellers(
   input: Record<string, unknown>
 ): Promise<string> {
@@ -1433,10 +1673,109 @@ async function handleQueryTopSellers(
   const vendorName = (input.vendorName as string) || "";
   const vendorId = (input.vendorId as string) || "";
   const category = (input.category as string) || "";
+  const days = (input.days as number) || 0;
   const limit = (input.limit as number) || 20;
 
   try {
-    // Build filter for ProductSales joined with InventoryItem
+    // --- If days is specified, paginate through live API and aggregate ---
+    if (days > 0) {
+      const token = await authenticateEmployee();
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      const cutoffUnix = Math.floor(cutoffDate.getTime() / 1000);
+
+      const productAgg: Record<string, { name: string; totalQty: number; totalRevenue: number; transactions: number }> = {};
+      let offset = 0;
+      let keepFetching = true;
+
+      while (keepFetching && offset < 500) {
+        const res = await fetch(`${COMCASH_OPENAPI_URL}/sale/list`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            OPEN_API_KEY: COMCASH_OPENAPI_KEY,
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ limit: 100, offset, order: "desc" }),
+        });
+
+        if (!res.ok) break;
+        const rawData = await res.json();
+        const batch = Array.isArray(rawData) ? rawData : rawData.data || [];
+        if (batch.length === 0) break;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const sale of batch as any[]) {
+          if ((sale.timeCreated || 0) < cutoffUnix) {
+            keepFetching = false;
+            break;
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          for (const p of (sale.products || []) as any[]) {
+            const title = (p.title || "").trim();
+            const key = title.toLowerCase();
+            const qty = parseFloat(p.quantity || "0") || 0;
+            const revenue = parseFloat(p.totalForProduct || "0") || 0;
+
+            if (!productAgg[key]) {
+              productAgg[key] = { name: title, totalQty: 0, totalRevenue: 0, transactions: 0 };
+            }
+            productAgg[key].totalQty += qty;
+            productAgg[key].totalRevenue += revenue;
+            productAgg[key].transactions += 1;
+          }
+        }
+
+        offset += batch.length;
+        if (batch.length < 100) keepFetching = false;
+      }
+
+      // Filter by category/vendor if requested (need to cross-ref inventory)
+      let results = Object.values(productAgg);
+
+      if (vendorName || vendorId || category) {
+        // Get inventory items for filtering
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const invWhere: any = { isActive: true };
+        let filterVendorId = vendorId;
+        if (vendorName && !filterVendorId) {
+          const vendor = await prisma.vendor.findFirst({
+            where: { name: { contains: vendorName, mode: "insensitive" } },
+            select: { id: true },
+          });
+          if (vendor) filterVendorId = vendor.id;
+        }
+        if (filterVendorId) invWhere.vendorId = filterVendorId;
+        if (category) invWhere.category = { contains: category, mode: "insensitive" };
+
+        const invItems = await prisma.inventoryItem.findMany({
+          where: invWhere,
+          select: { name: true },
+        });
+        const allowedNames = new Set(invItems.map((i) => i.name.toLowerCase()));
+        results = results.filter((p) => allowedNames.has(p.name.toLowerCase()));
+      }
+
+      // Sort and limit
+      results.sort((a, b) => sortBy === "revenue" ? b.totalRevenue - a.totalRevenue : b.totalQty - a.totalQty);
+      const topItems = results.slice(0, limit).map((p) => ({
+        name: p.name,
+        qtySold: Math.round(p.totalQty * 100) / 100,
+        revenue: Math.round(p.totalRevenue * 100) / 100,
+        transactions: p.transactions,
+      }));
+
+      return JSON.stringify({
+        source: "live_api",
+        period: `last ${days} days`,
+        salesScanned: offset,
+        items: topItems,
+        count: topItems.length,
+        sortedBy: sortBy === "revenue" ? "revenue" : "qty",
+      });
+    }
+
+    // --- No days specified: use all-time ProductSales cache ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {};
 
