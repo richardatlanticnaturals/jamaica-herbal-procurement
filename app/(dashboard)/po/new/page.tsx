@@ -89,6 +89,7 @@ export default function NewPurchaseOrderPage() {
 
   // Auto-fill low stock
   const [autoFilling, setAutoFilling] = useState(false);
+  const [autoFillMessage, setAutoFillMessage] = useState<string | null>(null);
 
   // --- Load vendors on mount ---
   useEffect(() => {
@@ -143,8 +144,8 @@ export default function NewPurchaseOrderPage() {
     // Prevent duplicates
     if (lineItems.some((li) => li.inventoryItemId === item.id)) return;
 
-    // Default qty = maxStockLevel - currentStock, where maxStockLevel = reorderPoint + reorderQty
-    const defaultQty = Math.max(1, (item.reorderPoint + item.reorderQty) - item.currentStock);
+    // Fix: order qty capped at reorderQty, negative stock treated as 0
+    const defaultQty = Math.min(item.reorderQty, Math.max(1, (item.reorderPoint + item.reorderQty) - Math.max(0, item.currentStock)));
 
     setLineItems((prev) => [
       ...prev,
@@ -162,9 +163,14 @@ export default function NewPurchaseOrderPage() {
   };
 
   // --- Auto-fill low stock items for selected vendor ---
+  // State for excluding slow movers
+  const [excludeSlowMovers, setExcludeSlowMovers] = useState(true);
+
   const autoFillLowStock = useCallback(async () => {
     if (!selectedVendorId) return;
     setAutoFilling(true);
+    setError(null);
+    setAutoFillMessage(null);
     try {
       // Fetch all items for this vendor
       const res = await fetch(`/api/inventory?vendorId=${selectedVendorId}&limit=500&filter=all`);
@@ -181,9 +187,32 @@ export default function NewPurchaseOrderPage() {
         return;
       }
 
-      // Add all low stock items, skip duplicates
+      // Optionally exclude slow movers (no sales in 4 months)
+      let filtered = lowStock;
+      let excludedCount = 0;
+      if (excludeSlowMovers) {
+        try {
+          const skus = lowStock.map((i: any) => i.sku).filter(Boolean);
+          const salesCheckRes = await fetch("/api/inventory/sales-check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ skus }),
+          });
+          if (salesCheckRes.ok) {
+            const salesData = await salesCheckRes.json();
+            const soldSkus = new Set(salesData.soldSkus || []);
+            const before = filtered.length;
+            filtered = filtered.filter((i: any) => soldSkus.has(i.sku));
+            excludedCount = before - filtered.length;
+          }
+        } catch {
+          // If sales check fails, include all items
+        }
+      }
+
+      // Add items, skip duplicates
       const existingIds = new Set(lineItems.map((li) => li.inventoryItemId));
-      const newItems: LineItem[] = lowStock
+      const newItems: LineItem[] = filtered
         .filter((i: any) => !existingIds.has(i.id))
         .map((i: any) => ({
           inventoryItemId: i.id,
@@ -191,19 +220,23 @@ export default function NewPurchaseOrderPage() {
           name: i.name,
           vendorSku: i.vendorSku || null,
           description: i.name,
-          qtyOrdered: Math.max(1, ((i.reorderPoint || 5) + (i.reorderQty || 10)) - i.currentStock),
+          qtyOrdered: Math.min((i.reorderQty || 10), Math.max(1, ((i.reorderPoint || 5) + (i.reorderQty || 10)) - Math.max(0, i.currentStock))),
           unitCost: Number(i.costPrice) || 0,
           unitOfMeasure: i.unitOfMeasure || "Each",
         }));
 
       setLineItems((prev) => [...prev, ...newItems]);
-      setError(null);
+      if (excludedCount > 0) {
+        setAutoFillMessage(`Added ${newItems.length} items. Excluded ${excludedCount} slow movers (no sales in 4 months).`);
+      } else if (newItems.length > 0) {
+        setAutoFillMessage(`Added ${newItems.length} low-stock items.`);
+      }
     } catch {
       setError("Failed to auto-fill low stock items");
     } finally {
       setAutoFilling(false);
     }
-  }, [selectedVendorId, lineItems]);
+  }, [selectedVendorId, lineItems, excludeSlowMovers]);
 
   // --- Update line item fields ---
   const updateLineItem = (
@@ -360,7 +393,16 @@ export default function NewPurchaseOrderPage() {
                 2
               </Badge>
               <h2 className="text-lg font-semibold">Add Items</h2>
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={excludeSlowMovers}
+                    onChange={(e) => setExcludeSlowMovers(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  Exclude slow movers
+                </label>
                 <Button
                   variant="outline"
                   size="sm"
@@ -375,6 +417,13 @@ export default function NewPurchaseOrderPage() {
                 </Button>
               </div>
             </div>
+
+            {/* Auto-fill result message */}
+            {autoFillMessage && (
+              <div className="rounded-lg px-4 py-2 mb-4 text-sm bg-blue-50 text-blue-700">
+                {autoFillMessage}
+              </div>
+            )}
 
             {/* Search bar */}
             <div className="relative mb-4">

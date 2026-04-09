@@ -353,7 +353,7 @@ export default function PODetailPage() {
 
   const addItemToEdit = (item: any) => {
     if (editLineItems.some((li) => li.inventoryItemId === item.id)) return;
-    const defaultQty = Math.max(1, (item.reorderPoint + item.reorderQty) - item.currentStock);
+    const defaultQty = Math.min(item.reorderQty, Math.max(1, (item.reorderPoint + item.reorderQty) - Math.max(0, item.currentStock)));
     setEditLineItems((prev) => [
       ...prev,
       {

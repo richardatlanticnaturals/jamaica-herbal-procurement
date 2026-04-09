@@ -90,9 +90,9 @@ export async function POST(request: NextRequest) {
         const poNumber = `${settings.poNumberPrefix}-${year}-${String(nextSeq).padStart(4, "0")}`;
         nextSeq++;
 
-        // Fix: order qty = maxStockLevel - currentStock, where maxStockLevel = reorderPoint + reorderQty
+        // Fix: order qty capped at reorderQty, negative stock treated as 0
         const lineItems = items.map((item) => {
-          const qtyOrdered = Math.max(1, (item.reorderPoint + item.reorderQty) - item.currentStock);
+          const qtyOrdered = Math.min(item.reorderQty, Math.max(1, (item.reorderPoint + item.reorderQty) - Math.max(0, item.currentStock)));
           return {
             inventoryItemId: item.id,
             vendorSku: item.vendorSku || null,

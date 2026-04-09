@@ -109,6 +109,20 @@ const poTools: Anthropic.Tool[] = [
     },
   },
   {
+    name: "update_all_items",
+    description: "Update ALL line items on this PO at once. Use for: 'set all quantities to 10', 'cap all quantities at 12', 'increase all quantities by 5'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        setQty: { type: "number", description: "Set all quantities to this exact number" },
+        maxQty: { type: "number", description: "Cap quantities at this max (reduce any above it)" },
+        minQty: { type: "number", description: "Set minimum quantity (increase any below it)" },
+        addQty: { type: "number", description: "Add this amount to all quantities" },
+      },
+      required: [],
+    },
+  },
+  {
     name: "remove_slow_movers",
     description: "Remove items from this PO that haven't sold in X months. Checks the ProductSales cache. Always do a dry run first.",
     input_schema: {
@@ -157,13 +171,15 @@ async function executeToolCall(
           result: "Cannot edit: PO is not in DRAFT or APPROVED status.",
           poUpdated: false,
         };
-      const match = (input.match as string).toLowerCase();
+      const matchStr = (input.match as string) || "";
+      if (!matchStr) return { result: "Please specify which item.", poUpdated: false };
+      const match = matchStr.toLowerCase();
       const po = await loadPO(poId);
       if (!po) return { result: "PO not found.", poUpdated: false };
 
       const found = po.lineItems.find(
         (li) =>
-          li.description.toLowerCase().includes(match) ||
+          (li.description || "").toLowerCase().includes(match) ||
           (li.inventoryItem?.sku || "").toLowerCase().includes(match) ||
           (li.vendorSku || "").toLowerCase().includes(match)
       );
@@ -346,13 +362,15 @@ async function executeToolCall(
           result: "Cannot edit: PO is not in DRAFT or APPROVED status.",
           poUpdated: false,
         };
-      const match = (input.match as string).toLowerCase();
+      const matchStr = (input.match as string) || "";
+      if (!matchStr) return { result: "Please specify which item.", poUpdated: false };
+      const match = matchStr.toLowerCase();
       const po = await loadPO(poId);
       if (!po) return { result: "PO not found.", poUpdated: false };
 
       const found = po.lineItems.find(
         (li) =>
-          li.description.toLowerCase().includes(match) ||
+          (li.description || "").toLowerCase().includes(match) ||
           (li.inventoryItem?.sku || "").toLowerCase().includes(match) ||
           (li.vendorSku || "").toLowerCase().includes(match)
       );
@@ -406,6 +424,49 @@ async function executeToolCall(
       });
       return {
         result: `Notes updated to: "${notes || "(cleared)"}"`,
+        poUpdated: true,
+      };
+    }
+
+    case "update_all_items": {
+      if (!(await canEdit()))
+        return { result: "Cannot edit: PO is not in DRAFT or APPROVED status.", poUpdated: false };
+
+      const po = await loadPO(poId);
+      if (!po || po.lineItems.length === 0)
+        return { result: "PO has no items.", poUpdated: false };
+
+      const setQty = input.setQty as number | undefined;
+      const maxQty = input.maxQty as number | undefined;
+      const minQty = input.minQty as number | undefined;
+      const addQty = input.addQty as number | undefined;
+
+      let updated = 0;
+      await prisma.$transaction(async (tx) => {
+        for (const li of po.lineItems) {
+          let newQty = li.qtyOrdered;
+          if (setQty !== undefined) newQty = setQty;
+          if (addQty !== undefined) newQty = li.qtyOrdered + addQty;
+          if (maxQty !== undefined && newQty > maxQty) newQty = maxQty;
+          if (minQty !== undefined && newQty < minQty) newQty = minQty;
+          newQty = Math.max(1, Math.round(newQty));
+
+          if (newQty !== li.qtyOrdered) {
+            await tx.pOLineItem.update({
+              where: { id: li.id },
+              data: { qtyOrdered: newQty, lineTotal: newQty * Number(li.unitCost) },
+            });
+            updated++;
+          }
+        }
+        // Recalculate total
+        const allLines = await tx.pOLineItem.findMany({ where: { purchaseOrderId: poId } });
+        const subtotal = allLines.reduce((sum, l) => sum + Number(l.lineTotal), 0);
+        await tx.purchaseOrder.update({ where: { id: poId }, data: { subtotal, total: subtotal } });
+      });
+
+      return {
+        result: `Updated ${updated} of ${po.lineItems.length} items. New total: check summary.`,
         poUpdated: true,
       };
     }

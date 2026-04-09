@@ -1095,7 +1095,7 @@ async function handleCreateSmartPO(
   if (dryRun) {
     // Fix: order qty = maxStockLevel - currentStock, where maxStockLevel = reorderPoint + reorderQty
     const subtotal = itemsToOrder.reduce(
-      (sum, i) => sum + Math.max(1, (i.reorderPoint + i.reorderQty) - i.currentStock) * Number(i.costPrice), 0
+      (sum, i) => sum + Math.min(i.reorderQty, Math.max(1, (i.reorderPoint + i.reorderQty) - Math.max(0, i.currentStock))) * Number(i.costPrice), 0
     );
     return JSON.stringify({
       dryRun: true,
@@ -1107,7 +1107,7 @@ async function handleCreateSmartPO(
       sampleItems: itemsToOrder.slice(0, 15).map((i) => ({
         name: i.name,
         stock: i.currentStock,
-        orderQty: Math.max(1, (i.reorderPoint + i.reorderQty) - i.currentStock),
+        orderQty: Math.min(i.reorderQty, Math.max(1, (i.reorderPoint + i.reorderQty) - Math.max(0, i.currentStock))),
         cost: Number(i.costPrice),
       })),
       excludedSample: excluded.slice(0, 10),
@@ -1125,9 +1125,9 @@ async function handleCreateSmartPO(
 
     const poNumber = `${settings.poNumberPrefix}-${new Date().getFullYear()}-${String(settings.nextPoSequence).padStart(4, "0")}`;
 
-    // Fix: order qty = maxStockLevel - currentStock
+    // Fix: order qty capped at reorderQty, negative stock treated as 0
     const lineItems = itemsToOrder.map((item) => {
-      const qtyOrdered = Math.max(1, (item.reorderPoint + item.reorderQty) - item.currentStock);
+      const qtyOrdered = Math.min(item.reorderQty, Math.max(1, (item.reorderPoint + item.reorderQty) - Math.max(0, item.currentStock)));
       return {
         inventoryItemId: item.id,
         vendorSku: item.vendorSku || null,
@@ -1257,9 +1257,9 @@ async function handleAutoGeneratePOs(input: Record<string, unknown> = {}): Promi
       const poNumber = `${settings.poNumberPrefix}-${year}-${String(nextSeq).padStart(4, "0")}`;
       nextSeq++;
 
-      // Fix: order qty = maxStockLevel - currentStock
+      // Fix: order qty capped at reorderQty, negative stock treated as 0
       const lineItems = items.map((item) => {
-        const qtyOrdered = Math.max(1, (item.reorderPoint + item.reorderQty) - item.currentStock);
+        const qtyOrdered = Math.min(item.reorderQty, Math.max(1, (item.reorderPoint + item.reorderQty) - Math.max(0, item.currentStock)));
         return {
           inventoryItemId: item.id,
           vendorSku: item.vendorSku || null,
