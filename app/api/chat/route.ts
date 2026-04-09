@@ -627,8 +627,8 @@ async function handleQuerySales(
     if (timeFrom) body.timeFrom = timeFrom;
     if (timeTo) body.timeTo = timeTo;
 
-    // Fix: Use /employee/sale/list path (matches all other Employee API endpoints)
-    const res = await fetch(`${COMCASH_OPENAPI_URL}/employee/sale/list`, {
+    // Use V2 /sale/list (employee endpoint returns empty)
+    const res = await fetch(`${COMCASH_OPENAPI_URL}/sale/list`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

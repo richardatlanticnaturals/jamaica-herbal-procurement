@@ -78,9 +78,8 @@ export async function POST(req: NextRequest) {
     let reachedEnd = false;
 
     while (!reachedEnd) {
-      // Fix: Use /employee/sale/list path (matches all other Employee API endpoints)
-      // Fix: Pass limit/offset as numbers, not strings (per Comcash API spec)
-      const res = await fetch(`${COMCASH_OPENAPI_URL}/employee/sale/list`, {
+      // Use V2 /sale/list (NOT /employee/sale/list — employee endpoint returns empty)
+      const res = await fetch(`${COMCASH_OPENAPI_URL}/sale/list`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
