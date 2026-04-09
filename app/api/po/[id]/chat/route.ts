@@ -108,6 +108,18 @@ const poTools: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "remove_slow_movers",
+    description: "Remove items from this PO that haven't sold in X months. Checks the ProductSales cache. Always do a dry run first.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        months: { type: "number", description: "Remove items with no sales in this many months (default 4)" },
+        dryRun: { type: "boolean", description: "If true, show which items would be removed without removing them. ALWAYS do dry run first." },
+      },
+      required: [],
+    },
+  },
 ];
 
 // --- Execute a tool call against the PO ---
@@ -398,6 +410,68 @@ async function executeToolCall(
       };
     }
 
+    case "remove_slow_movers": {
+      const months = (input.months as number) || 4;
+      const dryRun = (input.dryRun as boolean) ?? true;
+
+      const po = await loadPO(poId);
+      if (!po) return { result: "PO not found.", poUpdated: false };
+
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - months);
+
+      // Get sales data for items in this PO
+      const skus = po.lineItems.map((li) => li.inventoryItem?.sku).filter(Boolean) as string[];
+      const salesData = await prisma.productSales.findMany({
+        where: { sku: { in: skus } },
+        select: { sku: true, lastSoldAt: true, totalQtySold: true },
+      });
+      const salesMap = new Map(salesData.map((s) => [s.sku, s]));
+
+      // Identify slow movers on this PO
+      const slowMovers = po.lineItems.filter((li) => {
+        const sku = li.inventoryItem?.sku;
+        if (!sku) return true; // No SKU = no sales data = slow mover
+        const sale = salesMap.get(sku);
+        if (!sale || !sale.lastSoldAt) return true; // Never sold
+        return sale.lastSoldAt < cutoff; // Last sold before cutoff
+      });
+
+      if (slowMovers.length === 0) {
+        return { result: `No slow movers found on this PO. All ${po.lineItems.length} items have sold in the last ${months} months.`, poUpdated: false };
+      }
+
+      if (dryRun) {
+        const list = slowMovers.map((li) => {
+          const sale = salesMap.get(li.inventoryItem?.sku || "");
+          const lastSold = sale?.lastSoldAt ? sale.lastSoldAt.toISOString().split("T")[0] : "never";
+          return `- ${li.description} (last sold: ${lastSold})`;
+        }).join("\n");
+        return {
+          result: `Found ${slowMovers.length} slow movers (no sales in ${months} months):\n${list}\n\nSay "yes" or "confirm" to remove them from this PO.`,
+          poUpdated: false,
+        };
+      }
+
+      // Actually remove them
+      const removeIds = slowMovers.map((li) => li.id);
+      await prisma.$transaction(async (tx) => {
+        await tx.pOLineItem.deleteMany({ where: { id: { in: removeIds } } });
+        const remaining = await tx.pOLineItem.findMany({ where: { purchaseOrderId: poId } });
+        const subtotal = remaining.reduce((sum, li) => sum + Number(li.lineTotal), 0);
+        await tx.purchaseOrder.update({
+          where: { id: poId },
+          data: { subtotal, total: subtotal },
+        });
+      });
+
+      const updatedPO = await loadPO(poId);
+      return {
+        result: `Removed ${slowMovers.length} slow movers. PO now has ${updatedPO?.lineItems.length || 0} items, $${Number(updatedPO?.total || 0).toFixed(2)}.`,
+        poUpdated: true,
+      };
+    }
+
     default:
       return { result: `Unknown tool: ${toolName}`, poUpdated: false };
   }
@@ -443,6 +517,7 @@ Items: ${itemList}
 ${canEditPO ? "Make changes directly when asked. Show a brief summary after each change." : "This PO is " + po.status + " - read-only. Answer questions but do not make changes."}
 For adds: search inventory first, confirm the item, then add it.
 For removes: match by name or SKU, confirm, then remove.
+For "remove items that haven't sold": use remove_slow_movers with dryRun:true first, show the list, then apply after confirmation.
 Be very concise. Use plain text, not markdown tables.`;
 
     // Convert messages to Claude format
@@ -470,7 +545,7 @@ Be very concise. Use plain text, not markdown tables.`;
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1024,
         system: systemPrompt,
-        tools: canEditPO ? poTools : [poTools[4]], // only get_po_summary if read-only
+        tools: canEditPO ? poTools : poTools.filter(t => t.name === "get_po_summary"), // only summary if read-only
         messages: currentMessages,
       });
 
