@@ -649,7 +649,7 @@ async function handleSearchSales(
 ): Promise<string> {
   const productSearch = ((input.productSearch as string) || "").toLowerCase().trim();
   const days = (input.days as number) || 7;
-  const maxSales = Math.min((input.limit as number) || 5000, 5000);
+  // No cap — scan ALL sales in the time period for accurate results
 
   try {
     const token = await authenticateEmployee();
@@ -666,7 +666,7 @@ async function handleSearchSales(
     const pageSize = 100;
     let keepFetching = true;
 
-    while (keepFetching && allSales.length < maxSales) {
+    while (keepFetching) {
       const res = await fetch(`${COMCASH_OPENAPI_URL}/sale/list`, {
         method: "POST",
         headers: {
