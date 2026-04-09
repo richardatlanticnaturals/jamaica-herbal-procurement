@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Check, Send, Clock, Download, Mail } from "lucide-react";
+import { ArrowLeft, Check, Send, Clock, Download, Mail, Trash2 } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700",
@@ -103,6 +103,24 @@ export default function PODetailPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm(`Delete PO ${po?.poNumber}? This cannot be undone.`)) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/po/${params.id}`, { method: "DELETE" });
+      if (res.ok) {
+        router.push("/po");
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to delete");
+      }
+    } catch (err) {
+      alert("Failed to delete PO");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground">
@@ -166,6 +184,12 @@ export default function PODetailPage() {
             <Button size="sm" variant="outline" onClick={handleSend} disabled={actionLoading}>
               <Mail className="mr-2 h-4 w-4" />
               Resend Email
+            </Button>
+          )}
+          {["DRAFT", "APPROVED", "CANCELLED"].includes(po.status) && (
+            <Button size="sm" variant="destructive" onClick={handleDelete} disabled={actionLoading}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
             </Button>
           )}
         </div>
