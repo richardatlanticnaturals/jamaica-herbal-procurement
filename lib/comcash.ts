@@ -232,7 +232,9 @@ export async function fetchProducts(
 
   // Handle various response shapes the API might return
   if (Array.isArray(response)) {
-    return { products: response, total: response.length };
+    // Don't use array length as total — it's just the batch size.
+    // Return -1 to signal "unknown total" so pagination continues until an empty batch.
+    return { products: response, total: -1 };
   }
 
   if (
@@ -283,8 +285,10 @@ export async function fetchAllProducts(
       onProgress(allProducts.length);
     }
 
-    // Stop if we've reached the total or got fewer than requested
-    if (products.length < limit || (total > 0 && offset >= total)) {
+    // Stop if we got fewer than requested (last page) or reached known total
+    if (products.length < limit) {
+      hasMore = false;
+    } else if (total > 0 && offset >= total) {
       hasMore = false;
     }
   }
