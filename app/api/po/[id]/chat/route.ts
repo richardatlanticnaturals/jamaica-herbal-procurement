@@ -504,29 +504,28 @@ export async function POST(
 
     const canEditPO = ["DRAFT", "APPROVED"].includes(po.status);
 
-    // Build concise system prompt with PO context
-    const itemList = po.lineItems
-      .map(
-        (li) =>
-          `${li.description} (${li.inventoryItem?.sku || "no-sku"}): ${li.qtyOrdered} x $${Number(li.unitCost).toFixed(2)}`
-      )
-      .join("; ");
+    // Build MINIMAL system prompt — don't include all line items (saves tokens)
+    // Claude can use get_po_summary tool if it needs the full list
+    const systemPrompt = `PO ${po.poNumber} | ${po.vendor?.name} | ${po.lineItems.length} items | $${Number(po.total).toFixed(2)} | ${po.status}
+${canEditPO ? "You can edit this PO." : "Read-only."}
+Tools: update_line_item, add_item, remove_item, update_notes, get_po_summary, remove_slow_movers.
+Use remove_slow_movers (dryRun:true first) when asked to remove items that haven't sold.
+Use get_po_summary to see all items. Be concise.`;
 
-    const systemPrompt = `You are editing PO ${po.poNumber} for ${po.vendor?.name || "unknown vendor"}. ${po.lineItems.length} items, $${Number(po.total).toFixed(2)}. Status: ${po.status}.
-Items: ${itemList}
-${canEditPO ? "Make changes directly when asked. Show a brief summary after each change." : "This PO is " + po.status + " - read-only. Answer questions but do not make changes."}
-For adds: search inventory first, confirm the item, then add it.
-For removes: match by name or SKU, confirm, then remove.
-For "remove items that haven't sold": use remove_slow_movers with dryRun:true first, show the list, then apply after confirmation.
-Be very concise. Use plain text, not markdown tables.`;
-
-    // Convert messages to Claude format
-    const claudeMessages: Anthropic.MessageParam[] = messages
+    // Convert messages to Claude format — only keep last 4 messages to save tokens
+    const recentMessages = messages
       .filter((m: { role: string }) => m.role === "user" || m.role === "assistant")
-      .map((m: { role: string; content: string }) => ({
+      .slice(-4);
+    const claudeMessages: Anthropic.MessageParam[] = recentMessages.map(
+      (m: { role: string; content: string }) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
-      }));
+      })
+    );
+    // Ensure first message is from user
+    if (claudeMessages.length > 0 && claudeMessages[0].role !== "user") {
+      claudeMessages.shift();
+    }
 
     // Token tracking
     let totalInputTokens = 0;
