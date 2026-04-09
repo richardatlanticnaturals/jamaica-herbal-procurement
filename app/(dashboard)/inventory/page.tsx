@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, Search, ChevronLeft, ChevronRight, Pencil, Database } from "lucide-react";
+import { Upload, Search, ChevronLeft, ChevronRight, Pencil, Database, ArrowUpFromLine } from "lucide-react";
 
 export default function InventoryPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -56,6 +56,8 @@ export default function InventoryPage() {
 
   // Stock refresh state
   const [stockRefreshing, setStockRefreshing] = useState(false);
+  const [pushingToComcash, setPushingToComcash] = useState(false);
+  const [pushResult, setPushResult] = useState<string | null>(null);
   const [lastStockSync, setLastStockSync] = useState<string | null>(null);
 
   // Edit form fields
@@ -130,6 +132,26 @@ export default function InventoryPage() {
       setStockRefreshing(false);
     }
   }, [loadItems, fetchLastStockSync]);
+
+  // Push stock levels to Comcash POS
+  const handlePushToComcash = useCallback(async () => {
+    setPushingToComcash(true);
+    setPushResult(null);
+    try {
+      const res = await fetch("/api/comcash/push-inventory", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setPushResult(`Pushed ${data.synced || 0} items to Comcash POS`);
+      } else {
+        setPushResult(`Error: ${data.error || "Failed to push"}`);
+      }
+    } catch {
+      setPushResult("Failed to push to Comcash");
+    } finally {
+      setPushingToComcash(false);
+      setTimeout(() => setPushResult(null), 5000);
+    }
+  }, []);
 
   useEffect(() => {
     loadVendors();
@@ -266,6 +288,16 @@ export default function InventoryPage() {
             <Database className={`h-3.5 w-3.5 mr-1 ${stockRefreshing ? "animate-spin" : ""}`} />
             {stockRefreshing ? "Syncing..." : "Refresh Stock"}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePushToComcash}
+            disabled={pushingToComcash}
+            className="h-7"
+          >
+            <ArrowUpFromLine className={`h-3.5 w-3.5 mr-1 ${pushingToComcash ? "animate-spin" : ""}`} />
+            {pushingToComcash ? "Pushing..." : "Push to Comcash"}
+          </Button>
           <label className="cursor-pointer inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-primary text-primary-foreground text-sm font-medium h-7 gap-1 px-2.5 hover:bg-primary/80 transition-all">
             <Upload className="h-3.5 w-3.5 mr-1" />
             {uploading ? "Importing..." : "Import CSV"}
@@ -283,6 +315,12 @@ export default function InventoryPage() {
       {importResult && (
         <div className={`rounded-lg px-4 py-3 text-sm ${importResult.startsWith("Error") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
           {importResult}
+        </div>
+      )}
+
+      {pushResult && (
+        <div className={`rounded-lg px-4 py-3 text-sm ${pushResult.startsWith("Error") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+          {pushResult}
         </div>
       )}
 
