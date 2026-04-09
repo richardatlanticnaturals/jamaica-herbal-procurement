@@ -75,7 +75,30 @@ export async function POST(
       }
     }
 
-    // Process everything in a transaction
+    // Step 0: Pull latest stock from Comcash BEFORE adding received qty
+    // This ensures we have current POS stock levels (accounts for in-store sales since last sync)
+    try {
+      const { refreshStock } = await import("@/lib/refresh-stock");
+      await refreshStock();
+      console.log("[Receiving] Stock refreshed from Comcash before confirming");
+    } catch (refreshErr) {
+      // Don't block receiving if refresh fails — just log and continue with app stock
+      console.warn("[Receiving] Failed to refresh stock from Comcash before confirming:", refreshErr);
+    }
+
+    // Re-load the receiving with fresh stock data
+    const freshReceiving = await prisma.receiving.findUnique({
+      where: { id },
+      include: {
+        lineItems: true,
+        purchaseOrder: { include: { lineItems: true } },
+      },
+    });
+    if (!freshReceiving) {
+      return NextResponse.json({ error: "Receiving not found after refresh" }, { status: 404 });
+    }
+
+    // Process everything in a transaction (using fresh stock levels)
     const result = await prisma.$transaction(async (tx) => {
       // 1. Update each ReceivingLineItem
       for (const item of lineItems) {
