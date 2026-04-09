@@ -39,6 +39,7 @@ import {
   Package,
   ArrowLeft,
   FolderOpen,
+  Download,
 } from "lucide-react";
 
 interface CategoryInfo {
@@ -395,12 +396,24 @@ export default function CategoriesPage() {
             {categories.length} categories, {totalItems} total items
           </p>
         </div>
-        <Button onClick={handleSync} disabled={syncing}>
-          <RefreshCw
-            className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`}
-          />
-          {syncing ? "Syncing..." : "Sync from Comcash"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              window.open("/api/export?type=categories", "_blank");
+            }}
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Export CSV
+          </Button>
+          <Button onClick={handleSync} disabled={syncing}>
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`}
+            />
+            {syncing ? "Syncing..." : "Sync from Comcash"}
+          </Button>
+        </div>
       </div>
 
       {/* Sync result banner */}

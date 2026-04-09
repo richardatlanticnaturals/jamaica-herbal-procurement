@@ -373,6 +373,21 @@ const tools: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "auto_tune_reorder_points",
+    description:
+      "Calculate optimal reorder points based on sales velocity over the last 4 months. Uses formula: ceil(avgDailySales * leadTimeDays * safetyFactor). Returns a preview of suggested changes. If dryRun is false, applies the changes. Always do a dry run first and show the user what will change before applying.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        safetyFactor: { type: "number", description: "Safety stock multiplier (default 1.5)" },
+        minReorderPoint: { type: "number", description: "Minimum reorder point floor (default 2)" },
+        periodDays: { type: "number", description: "Number of days of sales history to analyze (default 120)" },
+        dryRun: { type: "boolean", description: "If true (default), only preview changes without applying. Set to false to apply after user confirms." },
+      },
+      required: [],
+    },
+  },
 ];
 
 // --- Tool execution handlers ---
@@ -457,6 +472,7 @@ async function executeToolCall(
       case "query_top_sellers": result = await handleQueryTopSellers(input); break;
       case "query_product_history": result = await handleQueryProductHistory(input); break;
       case "refresh_stock": result = await handleRefreshStock(); break;
+      case "auto_tune_reorder_points": result = await handleAutoTuneReorderPoints(input); break;
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -2196,6 +2212,99 @@ async function handleBulkUpdateInventory(
     success: true,
     updated: result.count,
     message: `Updated ${result.count} items`,
+  });
+}
+
+// --- Auto-Tune Reorder Points handler ---
+async function handleAutoTuneReorderPoints(
+  input: Record<string, unknown>
+): Promise<string> {
+  const safetyFactor = (input.safetyFactor as number) || 1.5;
+  const minReorderPoint = (input.minReorderPoint as number) || 2;
+  const periodDays = (input.periodDays as number) || 120;
+  const dryRun = input.dryRun !== false; // default true
+
+  const periodStart = new Date();
+  periodStart.setDate(periodStart.getDate() - periodDays);
+
+  // Get active inventory items with vendor lead times
+  const items = await prisma.inventoryItem.findMany({
+    where: { isActive: true },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      reorderPoint: true,
+      vendor: { select: { leadTimeDays: true, name: true } },
+    },
+  });
+
+  // Get sales data for the period
+  const salesData = await prisma.productSales.findMany({
+    where: { periodStart: { gte: periodStart }, totalQtySold: { gt: 0 } },
+    select: { sku: true, totalQtySold: true, inventoryItemId: true },
+  });
+
+  // Aggregate sales by SKU
+  const salesBySku: Record<string, number> = {};
+  const salesByItemId: Record<string, number> = {};
+  for (const sale of salesData) {
+    salesBySku[sale.sku] = (salesBySku[sale.sku] || 0) + sale.totalQtySold;
+    if (sale.inventoryItemId) {
+      salesByItemId[sale.inventoryItemId] = (salesByItemId[sale.inventoryItemId] || 0) + sale.totalQtySold;
+    }
+  }
+
+  // Calculate suggestions
+  const changes: Array<{
+    id: string; name: string; current: number; suggested: number;
+    avgDaily: number; leadTime: number; vendor: string;
+  }> = [];
+
+  for (const item of items) {
+    const totalSold = salesBySku[item.sku] || salesByItemId[item.id] || 0;
+    const avgDaily = totalSold / periodDays;
+    const leadTime = item.vendor?.leadTimeDays || 7;
+    let suggested = Math.ceil(avgDaily * leadTime * safetyFactor);
+    if (suggested < minReorderPoint) suggested = minReorderPoint;
+
+    if (suggested !== item.reorderPoint) {
+      changes.push({
+        id: item.id,
+        name: item.name,
+        current: item.reorderPoint,
+        suggested,
+        avgDaily: Math.round(avgDaily * 100) / 100,
+        leadTime,
+        vendor: item.vendor?.name || "Unknown",
+      });
+    }
+  }
+
+  changes.sort((a, b) => Math.abs(b.suggested - b.current) - Math.abs(a.suggested - a.current));
+
+  if (!dryRun && changes.length > 0) {
+    const updates = changes.map((c) =>
+      prisma.inventoryItem.update({
+        where: { id: c.id },
+        data: { reorderPoint: c.suggested },
+      })
+    );
+    await prisma.$transaction(updates);
+  }
+
+  return JSON.stringify({
+    dryRun,
+    analyzed: items.length,
+    itemsWithChanges: changes.length,
+    applied: !dryRun ? changes.length : 0,
+    safetyFactor,
+    periodDays,
+    minReorderPoint,
+    changes: changes.slice(0, 30),
+    message: dryRun
+      ? `${changes.length} items would change. Send again with dryRun: false to apply.`
+      : `Applied ${changes.length} reorder point changes.`,
   });
 }
 

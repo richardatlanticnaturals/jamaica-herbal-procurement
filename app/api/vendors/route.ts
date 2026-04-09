@@ -23,6 +23,63 @@ export async function GET() {
   }
 }
 
+// PATCH /api/vendors — inline single-field update (requires id in body)
+export async function PATCH(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
+  try {
+    const body = await request.json();
+    const { id, field, value } = body;
+
+    if (!id || !field) {
+      return NextResponse.json(
+        { error: "id and field are required" },
+        { status: 400 }
+      );
+    }
+
+    // Whitelist of editable fields for inline editing
+    const allowedFields = [
+      "name", "contactName", "email", "phone", "website",
+      "orderMethod", "leadTimeDays", "minimumOrder", "paymentTerms", "notes",
+    ];
+
+    if (!allowedFields.includes(field)) {
+      return NextResponse.json(
+        { error: `Field '${field}' is not editable` },
+        { status: 400 }
+      );
+    }
+
+    // Coerce types as needed
+    let coercedValue: unknown = value;
+    if (field === "leadTimeDays") coercedValue = Number(value) || 0;
+    if (field === "minimumOrder") coercedValue = value ? Number(value) : null;
+    if (value === "" || value === null) {
+      if (field !== "name") coercedValue = null; // name is required
+    }
+
+    const vendor = await prisma.vendor.update({
+      where: { id },
+      data: { [field]: coercedValue },
+      include: {
+        _count: {
+          select: { items: true, purchaseOrders: true },
+        },
+      },
+    });
+
+    return NextResponse.json({ vendor });
+  } catch (error) {
+    console.error("Failed to patch vendor:", error);
+    return NextResponse.json(
+      { error: "Failed to update vendor" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   const authError = await requireAuth();
   if (authError) return authError;

@@ -27,6 +27,8 @@ import {
   Upload,
   ArrowDownToLine,
   BarChart3,
+  Zap,
+  Store,
 } from "lucide-react";
 
 interface AppSettings {
@@ -72,6 +74,15 @@ export default function SettingsPage() {
   // Sales sync states
   const [syncingSales, setSyncingSales] = useState(false);
   const [salesSyncResult, setSalesSyncResult] = useState<SyncResult | null>(null);
+
+  // Auto-tune reorder points states
+  const [autoTuning, setAutoTuning] = useState(false);
+  const [autoTuneResult, setAutoTuneResult] = useState<any>(null);
+  const [applyingAutoTune, setApplyingAutoTune] = useState(false);
+
+  // Shopify order sync states
+  const [syncingShopifyOrders, setSyncingShopifyOrders] = useState(false);
+  const [shopifyOrderResult, setShopifyOrderResult] = useState<SyncResult | null>(null);
 
   // Editable fields
   const [poPrefix, setPoPrefix] = useState("PO");
@@ -246,6 +257,86 @@ export default function SettingsPage() {
       });
     } finally {
       setSyncingSales(false);
+    }
+  };
+
+  // --- Auto-Tune Reorder Points ---
+  const handleAutoTunePreview = async () => {
+    setAutoTuning(true);
+    setAutoTuneResult(null);
+    try {
+      const res = await fetch("/api/inventory/auto-tune", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apply: false }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAutoTuneResult(data);
+      } else {
+        setAutoTuneResult({ error: data.error || "Auto-tune failed" });
+      }
+    } catch (err) {
+      setAutoTuneResult({
+        error: err instanceof Error ? err.message : "Auto-tune failed",
+      });
+    } finally {
+      setAutoTuning(false);
+    }
+  };
+
+  const handleAutoTuneApply = async () => {
+    setApplyingAutoTune(true);
+    try {
+      const res = await fetch("/api/inventory/auto-tune", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apply: true }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAutoTuneResult({
+          ...data,
+          applied: true,
+          _message: `Applied ${data.appliedCount} reorder point changes`,
+        });
+      } else {
+        setAutoTuneResult({ error: data.error || "Apply failed" });
+      }
+    } catch (err) {
+      setAutoTuneResult({
+        error: err instanceof Error ? err.message : "Apply failed",
+      });
+    } finally {
+      setApplyingAutoTune(false);
+    }
+  };
+
+  // --- Shopify Order Sync ---
+  const handleSyncShopifyOrders = async () => {
+    setSyncingShopifyOrders(true);
+    setShopifyOrderResult(null);
+    try {
+      const res = await fetch("/api/shopify/sync-orders", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setShopifyOrderResult({
+          success: true,
+          message: data.message || `Synced ${data.ordersProcessed} orders, updated ${data.itemsUpdated} items`,
+        });
+      } else {
+        setShopifyOrderResult({
+          success: false,
+          message: data.error || "Shopify order sync failed",
+        });
+      }
+    } catch (err) {
+      setShopifyOrderResult({
+        success: false,
+        message: err instanceof Error ? err.message : "Shopify order sync failed",
+      });
+    } finally {
+      setSyncingShopifyOrders(false);
     }
   };
 
@@ -574,6 +665,152 @@ export default function SettingsPage() {
                 </span>
               )}
             </div>
+
+            {/* Auto-Tune Section */}
+            <div className="pt-4 border-t space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Auto-Tune Reorder Points</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Calculate optimal reorder points based on 4-month sales velocity and vendor lead times
+                  </p>
+                </div>
+                <Button
+                  onClick={handleAutoTunePreview}
+                  disabled={autoTuning}
+                  size="sm"
+                  variant="outline"
+                >
+                  {autoTuning ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="mr-2 h-4 w-4" />
+                      Preview Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {autoTuneResult && !autoTuneResult.error && (
+                <div className="rounded-md border p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {autoTuneResult.itemsWithChanges} items would change
+                      <span className="text-muted-foreground font-normal ml-1">
+                        (of {autoTuneResult.totalItemsAnalyzed} analyzed)
+                      </span>
+                    </span>
+                    {autoTuneResult.applied ? (
+                      <Badge className="bg-green-100 text-green-700">
+                        <CheckCircle className="mr-1 h-3 w-3" />
+                        Applied {autoTuneResult.appliedCount} changes
+                      </Badge>
+                    ) : (
+                      <Button
+                        onClick={handleAutoTuneApply}
+                        disabled={applyingAutoTune || autoTuneResult.itemsWithChanges === 0}
+                        size="sm"
+                      >
+                        {applyingAutoTune ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Applying...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Apply Changes
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                  {autoTuneResult.preview && autoTuneResult.preview.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto text-xs">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-muted-foreground border-b">
+                            <th className="text-left py-1">Item</th>
+                            <th className="text-right py-1">Current</th>
+                            <th className="text-right py-1">Suggested</th>
+                            <th className="text-right py-1">Avg/Day</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {autoTuneResult.preview.slice(0, 20).map((p: any) => (
+                            <tr key={p.itemId} className="border-b border-muted/50">
+                              <td className="py-1 truncate max-w-[200px]">{p.name}</td>
+                              <td className="text-right py-1">{p.currentReorderPoint}</td>
+                              <td className="text-right py-1 font-medium">{p.suggestedReorderPoint}</td>
+                              <td className="text-right py-1">{p.avgDailySales}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {autoTuneResult.preview.length > 20 && (
+                        <p className="text-muted-foreground mt-1">
+                          ...and {autoTuneResult.preview.length - 20} more
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {autoTuneResult?.error && (
+                <div className="rounded-md p-3 text-sm bg-red-50 text-red-700 border border-red-200">
+                  <XCircle className="inline-block h-4 w-4 mr-2" />
+                  {autoTuneResult.error}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* --- Shopify Integration --- */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              <CardTitle>Shopify Integration</CardTitle>
+            </div>
+            <CardDescription>
+              Sync orders from Shopify to deduct sold quantities from inventory
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Sync Shopify Orders
+                </Label>
+                <p className="text-sm">
+                  Pulls recent paid orders and deducts sold quantities by SKU match
+                </p>
+              </div>
+              <Button
+                onClick={handleSyncShopifyOrders}
+                disabled={syncingShopifyOrders}
+                size="sm"
+                variant="outline"
+              >
+                {syncingShopifyOrders ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag className="mr-2 h-4 w-4" />
+                    Sync Shopify Orders
+                  </>
+                )}
+              </Button>
+            </div>
+            {renderSyncAlert(shopifyOrderResult)}
           </CardContent>
         </Card>
 

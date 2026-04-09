@@ -51,6 +51,62 @@ export async function GET(
   }
 }
 
+// PATCH /api/vendors/[id] — inline single-field update
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { field, value } = body;
+
+    if (!field) {
+      return NextResponse.json({ error: "field is required" }, { status: 400 });
+    }
+
+    const allowedFields = [
+      "name", "contactName", "email", "phone", "website",
+      "orderMethod", "leadTimeDays", "minimumOrder", "paymentTerms", "notes",
+    ];
+
+    if (!allowedFields.includes(field)) {
+      return NextResponse.json(
+        { error: `Field '${field}' is not editable` },
+        { status: 400 }
+      );
+    }
+
+    let coercedValue: unknown = value;
+    if (field === "leadTimeDays") coercedValue = Number(value) || 0;
+    if (field === "minimumOrder") coercedValue = value ? Number(value) : null;
+    if (value === "" || value === null) {
+      if (field !== "name") coercedValue = null;
+    }
+
+    const vendor = await prisma.vendor.update({
+      where: { id },
+      data: { [field]: coercedValue },
+      include: {
+        _count: {
+          select: { items: true, purchaseOrders: true },
+        },
+      },
+    });
+
+    return NextResponse.json({ vendor });
+  } catch (error) {
+    console.error("Failed to patch vendor:", error);
+    return NextResponse.json(
+      { error: "Failed to update vendor" },
+      { status: 500 }
+    );
+  }
+}
+
 // PUT /api/vendors/[id] — update vendor details
 export async function PUT(
   request: NextRequest,
