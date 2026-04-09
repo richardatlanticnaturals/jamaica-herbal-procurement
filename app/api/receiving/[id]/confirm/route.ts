@@ -127,7 +127,7 @@ export async function POST(
             });
           }
 
-          // 3. Update InventoryItem.currentStock and location-specific stock
+          // 3. Update InventoryItem.currentStock, location-specific stock, and cost price
           const stockUpdateData: Record<string, any> = {
             currentStock: {
               increment: item.qtyReceived,
@@ -137,6 +137,10 @@ export async function POST(
             stockUpdateData.locationLL = { increment: item.qtyReceived };
           } else if (locationCode === "NL") {
             stockUpdateData.locationNL = { increment: item.qtyReceived };
+          }
+          // Update cost price from invoice/packing slip OCR data if available
+          if (recLine.ocrUnitCost && Number(recLine.ocrUnitCost) > 0) {
+            stockUpdateData.costPrice = Number(recLine.ocrUnitCost);
           }
           await tx.inventoryItem.update({
             where: { id: recLine.inventoryItemId },
