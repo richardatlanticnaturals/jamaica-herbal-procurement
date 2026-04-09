@@ -22,6 +22,7 @@ const SYSTEM_PROMPT = `Jamaica Herbal procurement assistant. Two stores: Lauderd
 Be concise. Use markdown tables. Format money as $X.XX.
 WRITES: Always dry run first, show summary, ask "Ready to apply? yes/no", only apply after confirmation. After applying, sync to Comcash.
 READS: No confirmation needed.
+SLOW SELLERS: To find items that haven't sold recently, use query_slow_movers tool which checks the Comcash qtyUpdated timestamp (last stock movement date). This is more reliable than sales data.
 Categories: Herbs & Teas, Vitamins & Supplements, Essential Oils, Hair & Beauty, Body Care, Food & Beverages, Incense & Spiritual, Accessories.`;
 
 // --- Tool definitions for Claude ---
@@ -277,6 +278,20 @@ const tools: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "query_slow_movers",
+    description: "Find items that haven't had stock movement (sold or restocked) in X months. Uses Comcash qtyUpdated timestamp. Can filter by vendor.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        months: { type: "number", description: "Items with no movement in this many months (default 3)" },
+        vendorId: { type: "string", description: "Filter by vendor ID" },
+        vendorName: { type: "string", description: "Filter by vendor name (searches)" },
+        limit: { type: "number", description: "Max results (default 20)" },
+      },
+      required: [],
+    },
+  },
 ];
 
 // --- Tool execution handlers ---
@@ -331,6 +346,7 @@ async function executeToolCall(
       case "update_inventory_items": result = await handleUpdateInventoryItems(input); break;
       case "bulk_update_inventory": result = await handleBulkUpdateInventory(input); break;
       case "sync_inventory_to_comcash": result = await handleSyncInventoryToComcash(input); break;
+      case "query_slow_movers": result = await handleQuerySlowMovers(input); break;
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -987,6 +1003,109 @@ async function handleSyncProducts(): Promise<string> {
     updated,
     skipped,
   });
+}
+
+async function handleQuerySlowMovers(
+  input: Record<string, unknown>
+): Promise<string> {
+  const months = (input.months as number) || 3;
+  const vendorName = (input.vendorName as string) || "";
+  const vendorId = (input.vendorId as string) || "";
+  const limit = (input.limit as number) || 20;
+
+  try {
+    // Get JWT and fetch products with qtyUpdated from Comcash
+    const token = await authenticateEmployee();
+
+    // Find vendor ID if name given
+    let filterVendorId = vendorId;
+    if (vendorName && !filterVendorId) {
+      const vendor = await prisma.vendor.findFirst({
+        where: { name: { contains: vendorName, mode: "insensitive" } },
+        select: { id: true, comcashVendorId: true },
+      });
+      if (vendor?.comcashVendorId) {
+        filterVendorId = vendor.id;
+      }
+    }
+
+    // Calculate cutoff timestamp (months ago)
+    const cutoffDate = new Date();
+    cutoffDate.setMonth(cutoffDate.getMonth() - months);
+    const cutoffTimestamp = Math.floor(cutoffDate.getTime() / 1000);
+
+    // Fetch products from Comcash with qtyUpdated
+    const allSlowMovers: any[] = [];
+    let offset = 0;
+    const batchLimit = 100;
+
+    while (allSlowMovers.length < limit * 3) { // fetch extra to filter
+      const res = await fetch(`${COMCASH_OPENAPI_URL}/employee/product/list`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ offset, limit: batchLimit, sort: "title", order: "asc", warehouseIds: [1, 2, 3] }),
+      });
+
+      const products = await res.json();
+      if (!Array.isArray(products) || products.length === 0) break;
+
+      for (const p of products) {
+        const qtyUpdated = p.qtyUpdated || 0;
+        // Filter: last movement before cutoff
+        if (qtyUpdated > 0 && qtyUpdated < cutoffTimestamp) {
+          // Filter by vendor if specified
+          if (filterVendorId) {
+            const sku = (p.skuCodes && p.skuCodes[0]) || "";
+            const item = await prisma.inventoryItem.findFirst({
+              where: { OR: [{ sku }, { comcashItemId: String(p.id) }], vendorId: filterVendorId },
+              select: { id: true },
+            });
+            if (!item) continue;
+          } else if (vendorName) {
+            const vName = p.primaryVendorName || "";
+            if (!vName.toLowerCase().includes(vendorName.toLowerCase())) continue;
+          }
+
+          const onHand = Array.isArray(p.onHand)
+            ? p.onHand.reduce((s: number, w: any) => s + parseFloat(w.quantity || "0"), 0)
+            : 0;
+
+          allSlowMovers.push({
+            name: p.title,
+            sku: (p.skuCodes && p.skuCodes[0]) || "",
+            stock: Math.round(onHand),
+            cost: p.lastCost ? parseFloat(p.lastCost) : 0,
+            price: p.price ? parseFloat(p.price) : 0,
+            lastMovement: new Date(qtyUpdated * 1000).toISOString().split("T")[0],
+            vendor: p.primaryVendorName || "—",
+          });
+        }
+      }
+
+      if (products.length < batchLimit) break;
+      offset += batchLimit;
+      if (offset > 4000) break; // safety cap
+    }
+
+    // Sort by oldest movement first
+    allSlowMovers.sort((a, b) => a.lastMovement.localeCompare(b.lastMovement));
+    const result = allSlowMovers.slice(0, limit);
+
+    return JSON.stringify({
+      items: result,
+      count: result.length,
+      totalSlowMovers: allSlowMovers.length,
+      cutoffDate: cutoffDate.toISOString().split("T")[0],
+      message: `Found ${allSlowMovers.length} items with no stock movement since ${cutoffDate.toISOString().split("T")[0]}${vendorName ? ` from ${vendorName}` : ""}`,
+    });
+  } catch (err) {
+    return JSON.stringify({
+      error: `Failed to query slow movers: ${err instanceof Error ? err.message : "Unknown error"}`,
+    });
+  }
 }
 
 async function handleSyncInventoryToComcash(
