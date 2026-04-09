@@ -281,39 +281,49 @@ const tools: Anthropic.Tool[] = [
 
 // --- Tool execution handlers ---
 
+// Safety cap: truncate tool results to prevent token explosions
+const MAX_TOOL_RESULT_CHARS = 4000;
+function capResult(json: string): string {
+  if (json.length <= MAX_TOOL_RESULT_CHARS) return json;
+  // Try to parse and limit array items
+  try {
+    const obj = JSON.parse(json);
+    for (const key of Object.keys(obj)) {
+      if (Array.isArray(obj[key]) && obj[key].length > 10) {
+        const total = obj[key].length;
+        obj[key] = obj[key].slice(0, 10);
+        obj[key + "_note"] = `Showing 10 of ${total}. Ask for more with higher limit.`;
+      }
+    }
+    const trimmed = JSON.stringify(obj);
+    if (trimmed.length <= MAX_TOOL_RESULT_CHARS) return trimmed;
+  } catch {}
+  return json.slice(0, MAX_TOOL_RESULT_CHARS) + '..."truncated"}';
+}
+
 async function executeToolCall(
   name: string,
   input: Record<string, unknown>
 ): Promise<string> {
   try {
+    let result: string;
     switch (name) {
-      case "query_inventory":
-        return await handleQueryInventory(input);
-      case "query_purchase_orders":
-        return await handleQueryPurchaseOrders(input);
-      case "query_vendors":
-        return await handleQueryVendors(input);
-      case "query_sales":
-        return await handleQuerySales(input);
-      case "create_purchase_order":
-        return await handleCreatePO(input);
-      case "auto_generate_pos":
-        return await handleAutoGeneratePOs();
-      case "get_dashboard_stats":
-        return await handleDashboardStats();
-      case "sync_comcash_vendors":
-        return await handleSyncVendors();
-      case "sync_comcash_products":
-        return await handleSyncProducts();
-      case "update_inventory_items":
-        return await handleUpdateInventoryItems(input);
-      case "bulk_update_inventory":
-        return await handleBulkUpdateInventory(input);
-      case "sync_inventory_to_comcash":
-        return await handleSyncInventoryToComcash(input);
+      case "query_inventory": result = await handleQueryInventory(input); break;
+      case "query_purchase_orders": result = await handleQueryPurchaseOrders(input); break;
+      case "query_vendors": result = await handleQueryVendors(input); break;
+      case "query_sales": result = await handleQuerySales(input); break;
+      case "create_purchase_order": result = await handleCreatePO(input); break;
+      case "auto_generate_pos": result = await handleAutoGeneratePOs(); break;
+      case "get_dashboard_stats": result = await handleDashboardStats(); break;
+      case "sync_comcash_vendors": result = await handleSyncVendors(); break;
+      case "sync_comcash_products": result = await handleSyncProducts(); break;
+      case "update_inventory_items": result = await handleUpdateInventoryItems(input); break;
+      case "bulk_update_inventory": result = await handleBulkUpdateInventory(input); break;
+      case "sync_inventory_to_comcash": result = await handleSyncInventoryToComcash(input); break;
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
+    return capResult(result);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     console.error(`[Chat Tool Error] ${name}:`, msg);
@@ -517,15 +527,24 @@ async function handleQuerySales(
       });
     }
 
-    const data = await res.json();
+    const rawData = await res.json();
+    const salesArr = Array.isArray(rawData) ? rawData : rawData.data || [];
 
-    // Return whatever the API gives us -- Claude will interpret it
-    return JSON.stringify({
-      sales: Array.isArray(data) ? data : data.data || data,
-      count: Array.isArray(data)
-        ? data.length
-        : data.total || (data.data ? data.data.length : 0),
-    });
+    // Slim down sales data — only send what Claude needs, not full objects
+    const sales = salesArr.slice(0, Math.min(limit, 20)).map((s: any) => ({
+      id: s.id,
+      date: s.timeCreated ? new Date(s.timeCreated * 1000).toISOString().split("T")[0] : "",
+      total: s.payment?.totalPayedAmount || "0",
+      customer: s.customer ? `${s.customer.firstName || ""} ${s.customer.lastName || ""}`.trim() : "Walk-in",
+      employee: s.employeeId,
+      items: (s.products || []).map((p: any) => ({
+        name: p.title,
+        qty: p.quantity,
+        price: p.totalForProduct,
+      })),
+    }));
+
+    return JSON.stringify({ sales, count: salesArr.length });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     return JSON.stringify({
