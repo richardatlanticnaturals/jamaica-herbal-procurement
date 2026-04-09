@@ -1105,7 +1105,7 @@ async function handleCreateSmartPO(
   if (dryRun) {
     // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
     const subtotal = itemsToOrder.reduce(
-      (sum, i) => sum + Math.max(2, (velocityMap.get(i.sku) || 0) + 2) * Number(i.costPrice), 0
+      (sum, i) => sum + Math.max(1, velocityMap.get(i.sku) || 0) * Number(i.costPrice), 0
     );
     return JSON.stringify({
       dryRun: true,
@@ -1117,7 +1117,7 @@ async function handleCreateSmartPO(
       sampleItems: itemsToOrder.slice(0, 15).map((i) => ({
         name: i.name,
         stock: i.currentStock,
-        orderQty: Math.max(2, (velocityMap.get(i.sku) || 0) + 2),
+        orderQty: Math.max(1, velocityMap.get(i.sku) || 0),
         cost: Number(i.costPrice),
       })),
       excludedSample: excluded.slice(0, 10),
@@ -1137,7 +1137,7 @@ async function handleCreateSmartPO(
 
     // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
     const lineItems = itemsToOrder.map((item) => {
-      const qtyOrdered = Math.max(2, (velocityMap.get(item.sku) || 0) + 2);
+      const qtyOrdered = Math.max(1, velocityMap.get(item.sku) || 0);
       return {
         inventoryItemId: item.id,
         vendorSku: item.vendorSku || null,
@@ -1283,7 +1283,7 @@ async function handleAutoGeneratePOs(input: Record<string, unknown> = {}): Promi
 
       // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
       const lineItems = activeItems.map((item) => {
-        const qtyOrdered = Math.max(2, (autoSalesMap.get(item.sku) || 0) + 2);
+        const qtyOrdered = Math.max(1, autoSalesMap.get(item.sku) || 0);
         return {
           inventoryItemId: item.id,
           vendorSku: item.vendorSku || null,

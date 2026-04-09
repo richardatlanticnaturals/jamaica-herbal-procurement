@@ -237,7 +237,7 @@ export default function NewPurchaseOrderPage() {
           name: i.name,
           vendorSku: i.vendorSku || null,
           description: i.name,
-          qtyOrdered: Math.max(2, (salesBySku[i.sku] || 0) + 2),
+          qtyOrdered: Math.max(1, salesBySku[i.sku] || 0),
           unitCost: Number(i.costPrice) || 0,
           unitOfMeasure: i.unitOfMeasure || "Each",
         }));

@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
         // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
         const lineItems = activeItems.map((item) => {
-          const qtyOrdered = Math.max(2, (salesMap.get(item.sku) || 0) + 2);
+          const qtyOrdered = Math.max(1, salesMap.get(item.sku) || 0);
           return {
             inventoryItemId: item.id,
             vendorSku: item.vendorSku || null,
