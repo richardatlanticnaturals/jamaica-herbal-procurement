@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
+import { fetchCategories } from "@/lib/comcash";
 
 /**
  * GET /api/categories
- * Returns distinct categories from InventoryItem with item counts.
+ * Returns categories from inventory items + any Comcash categories not yet in use.
  */
 export async function GET() {
   const authError = await requireAuth();
@@ -24,6 +25,24 @@ export async function GET() {
       itemCount: g._count.id,
       isUncategorized: !g.category,
     }));
+
+    // Also fetch Comcash categories and include any that don't exist in the app yet
+    try {
+      const comcashCats = await fetchCategories();
+      const existingNames = new Set(categories.map((c) => c.name.toLowerCase()));
+      for (const cc of comcashCats) {
+        const name = cc.title || "";
+        if (name && name !== "NONE" && !existingNames.has(name.toLowerCase())) {
+          categories.push({
+            name,
+            itemCount: 0,
+            isUncategorized: false,
+          });
+        }
+      }
+    } catch {
+      // If Comcash is unreachable, just use DB categories
+    }
 
     return NextResponse.json({ categories });
   } catch (error) {
