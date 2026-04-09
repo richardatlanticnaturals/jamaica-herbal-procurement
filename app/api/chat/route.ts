@@ -20,15 +20,36 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // --- System prompt for the procurement assistant ---
 const SYSTEM_PROMPT = `You are the Jamaica Herbal procurement assistant. You help manage inventory, purchase orders, vendors, and sales data for two store locations in South Florida (Lauderdale Lakes and North Lauderdale).
 
-Rules:
+CRITICAL CONFIRMATION RULES:
+- NEVER make changes without showing the user a summary first and getting explicit confirmation.
+- For ANY write operation (editing inventory, creating POs, syncing, bulk updates), you MUST follow this exact flow:
+
+  1. PREVIEW: Do a dry run or query first. Show a clear summary table of what will change:
+     - How many items affected
+     - Sample of items (names, current values, new values)
+     - What systems will be updated (App Database + Comcash POS)
+
+  2. ASK: End your message with a clear question like:
+     "**Ready to apply these changes?** This will update X items in both the app and Comcash POS. Reply **yes** to confirm or **no** to cancel."
+
+  3. WAIT: Do NOT call any write tools until the user replies with confirmation (yes, confirm, do it, go ahead, etc.)
+
+  4. APPLY: Only after confirmation, call the write tool with dryRun: false. After the app database is updated, also call sync_inventory_to_comcash to push stock changes to the POS.
+
+  5. RECEIPT: Show a summary of what was changed:
+     - Items updated in app: X
+     - Items pushed to Comcash: Y
+     - Any errors
+
+- If the user says "no" or "cancel", acknowledge and do NOT apply changes.
+- For read-only queries (show me, list, what are, how many), no confirmation needed.
+
+OTHER RULES:
 - Be concise and use markdown tables for data when appropriate.
 - Format monetary values with $ and two decimal places.
 - If someone asks about best sellers, query sales data.
 - If someone asks about stock levels, query inventory.
-- Always confirm before creating purchase orders.
-- For inventory edits (categorizing, stock adjustments, bulk changes): ALWAYS do a dry run first using dryRun: true, tell the user how many items will be affected, and ask for confirmation before applying with dryRun: false.
-- For bulk operations like "set all negative stock to 0", use the bulk_update_inventory tool with the appropriate filter and set values.
-- For categorizing items, you can query uncategorized items first, then use AI reasoning to suggest categories based on item names, then apply with update_inventory_items.
+- For categorizing items, query uncategorized items first, suggest categories based on item names, show the mapping, and wait for confirmation.
 - Common categories for a herbal/natural products store: Herbs & Teas, Vitamins & Supplements, Essential Oils, Hair & Beauty, Body Care, Food & Beverages, Incense & Spiritual, Books & Accessories.`;
 
 // --- Tool definitions for Claude ---
@@ -283,6 +304,22 @@ const tools: Anthropic.Tool[] = [
       required: ["filter", "set"],
     },
   },
+  {
+    name: "sync_inventory_to_comcash",
+    description:
+      "Push updated inventory stock levels from the app database to Comcash POS via warehouse/changeQuantity. Call this AFTER applying inventory changes to sync the POS system. Pass the IDs of items that were changed.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        inventoryItemIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array of inventory item IDs to sync to Comcash. If empty, syncs all items that have a comcashItemId.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 // --- Tool execution handlers ---
@@ -315,6 +352,8 @@ async function executeToolCall(
         return await handleUpdateInventoryItems(input);
       case "bulk_update_inventory":
         return await handleBulkUpdateInventory(input);
+      case "sync_inventory_to_comcash":
+        return await handleSyncInventoryToComcash(input);
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -962,6 +1001,99 @@ async function handleSyncProducts(): Promise<string> {
     updated,
     skipped,
   });
+}
+
+async function handleSyncInventoryToComcash(
+  input: Record<string, unknown>
+): Promise<string> {
+  const inventoryItemIds = (input.inventoryItemIds as string[]) || [];
+
+  try {
+    // Get items to sync — either specific IDs or all with comcashItemId
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = { comcashItemId: { not: null } };
+    if (inventoryItemIds.length > 0) {
+      where.id = { in: inventoryItemIds };
+    }
+
+    const items = await prisma.inventoryItem.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        comcashItemId: true,
+        currentStock: true,
+      },
+    });
+
+    if (items.length === 0) {
+      return JSON.stringify({
+        message: "No items with Comcash IDs found to sync",
+        synced: 0,
+      });
+    }
+
+    // Authenticate with Comcash
+    const token = await authenticateEmployee();
+
+    // Push each item's stock to Comcash via warehouse/changeQuantity
+    let synced = 0;
+    const errors: string[] = [];
+
+    // Batch items in groups of 25
+    const batchSize = 25;
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+
+      const products = batch.map((item) => ({
+        productId: parseInt(item.comcashItemId!, 10),
+        warehouseId: 1,
+        measureUnitId: 1,
+        quantity: item.currentStock,
+      }));
+
+      try {
+        const res = await fetch(
+          `${COMCASH_OPENAPI_URL}/employee/warehouse/changeQuantity`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              note: `Sync from procurement app ${new Date().toISOString()}`,
+              products,
+            }),
+          }
+        );
+
+        if (res.ok) {
+          synced += batch.length;
+        } else {
+          const errText = await res.text();
+          errors.push(`Batch ${Math.floor(i / batchSize) + 1}: ${errText.slice(0, 100)}`);
+        }
+      } catch (err) {
+        errors.push(
+          `Batch ${Math.floor(i / batchSize) + 1}: ${err instanceof Error ? err.message : "Unknown error"}`
+        );
+      }
+    }
+
+    return JSON.stringify({
+      success: synced > 0,
+      synced,
+      total: items.length,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `Synced ${synced} of ${items.length} items to Comcash POS${errors.length > 0 ? ` (${errors.length} batch errors)` : ""}`,
+    });
+  } catch (err) {
+    return JSON.stringify({
+      error: `Failed to sync to Comcash: ${err instanceof Error ? err.message : "Unknown error"}`,
+    });
+  }
 }
 
 async function handleUpdateInventoryItems(
