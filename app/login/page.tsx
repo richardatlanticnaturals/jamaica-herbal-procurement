@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,24 +38,16 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#F8F7F4' }}>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-green-700"
-            >
-              <path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 17 3.5s2 1.9 2 5.1a7 7 0 0 1-5 6.7" />
-              <path d="M11.2 12a7 7 0 0 0-3.8 5.4" />
-            </svg>
+          <div className="mx-auto mb-2">
+            <Image
+              src="/jh-logo.png"
+              alt="Jamaica Herbal"
+              width={280}
+              height={70}
+              className="h-auto w-[280px]"
+              priority
+            />
           </div>
-          <CardTitle className="text-2xl font-bold">Jamaica Herbal</CardTitle>
           <CardDescription>Procurement Management System</CardDescription>
         </CardHeader>
         <CardContent>
