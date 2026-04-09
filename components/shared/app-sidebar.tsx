@@ -53,17 +53,18 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b px-4 py-3">
-        <div className="flex items-center gap-3">
+      <SidebarHeader className="border-b px-3 py-4">
+        <Link href="/" className="block">
           <Image
             src="/jh-logo.png"
             alt="Jamaica Herbal"
-            width={140}
-            height={40}
-            className="h-9 w-auto"
+            width={240}
+            height={60}
+            className="w-full h-auto"
             priority
           />
-        </div>
+        </Link>
+        <p className="text-[10px] text-muted-foreground text-center tracking-widest uppercase mt-1">Procurement System</p>
       </SidebarHeader>
 
       <SidebarContent>
