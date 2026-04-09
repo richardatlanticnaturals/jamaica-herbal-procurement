@@ -1,7 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import fs from "fs";
-import path from "path";
+import { JH_LOGO_BASE64 } from "@/lib/jh-logo-base64";
 
 interface LineItem {
   description: string;
@@ -39,14 +38,11 @@ export function generatePOPdf(po: PO): Buffer {
   doc.setFillColor(248, 247, 244); // off-white #F8F7F4 (matches app theme)
   doc.rect(0, 0, pageWidth, 40, "F");
 
-  // Add logo image
+  // Add logo image (embedded base64 -- works on Vercel serverless)
   try {
-    const logoPath = path.join(process.cwd(), "public", "jh-logo.png");
-    const logoData = fs.readFileSync(logoPath);
-    const logoBase64 = logoData.toString("base64");
-    doc.addImage(`data:image/png;base64,${logoBase64}`, "PNG", 14, 6, 70, 28);
+    doc.addImage(`data:image/png;base64,${JH_LOGO_BASE64}`, "PNG", 14, 6, 70, 28);
   } catch {
-    // Fallback text if logo not found
+    // Fallback text if logo fails to render
     doc.setTextColor(100, 100, 100);
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
