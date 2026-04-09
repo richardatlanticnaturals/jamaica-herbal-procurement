@@ -1292,9 +1292,9 @@ export async function POST(request: NextRequest) {
     );
 
     // Token usage tracking across all loop iterations
-    // Haiku pricing: $0.80/M input, $4.00/M output
-    const COST_PER_INPUT_TOKEN = 0.80 / 1_000_000;
-    const COST_PER_OUTPUT_TOKEN = 4.00 / 1_000_000;
+    // Haiku 4.5 pricing: $1.00/M input, $5.00/M output
+    const COST_PER_INPUT_TOKEN = 1.00 / 1_000_000;
+    const COST_PER_OUTPUT_TOKEN = 5.00 / 1_000_000;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
 
@@ -1307,7 +1307,7 @@ export async function POST(request: NextRequest) {
       loopCount++;
 
       const response = await anthropic.messages.create({
-        model: "claude-3-5-haiku-20241022",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
         tools,
