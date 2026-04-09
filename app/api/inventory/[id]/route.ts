@@ -33,6 +33,43 @@ export async function GET(
   }
 }
 
+// PATCH /api/inventory/[id] — partial update (e.g. category reassignment)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
+  try {
+    const { id } = await params;
+    const body = await request.json();
+
+    const data: Record<string, unknown> = {};
+    if (body.category !== undefined) data.category = body.category || null;
+    if (body.reorderPoint !== undefined) data.reorderPoint = Number(body.reorderPoint);
+    if (body.reorderQty !== undefined) data.reorderQty = Number(body.reorderQty);
+    if (body.vendorId !== undefined) data.vendorId = body.vendorId || null;
+    if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+
+    const item = await prisma.inventoryItem.update({
+      where: { id },
+      data,
+      include: {
+        vendor: { select: { id: true, name: true } },
+      },
+    });
+
+    return NextResponse.json({ item });
+  } catch (error) {
+    console.error("Failed to patch inventory item:", error);
+    return NextResponse.json(
+      { error: "Failed to update inventory item" },
+      { status: 500 }
+    );
+  }
+}
+
 // PUT /api/inventory/[id] — update inventory item settings
 export async function PUT(
   request: NextRequest,
@@ -53,6 +90,7 @@ export async function PUT(
     if (body.retailPrice !== undefined) data.retailPrice = Number(body.retailPrice);
     if (body.vendorId !== undefined) data.vendorId = body.vendorId || null;
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+    if (body.category !== undefined) data.category = body.category || null;
 
     const item = await prisma.inventoryItem.update({
       where: { id },

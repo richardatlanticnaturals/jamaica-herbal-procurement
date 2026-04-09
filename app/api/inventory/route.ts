@@ -14,12 +14,20 @@ export async function GET(request: NextRequest) {
     const filter = searchParams.get("filter") || "all"; // all, low-stock, out-of-stock
 
     const vendorId = searchParams.get("vendorId") || "";
+    const category = searchParams.get("category") || "";
 
     const where: any = { isActive: true };
 
     // Filter by vendor if provided
     if (vendorId) {
       where.vendorId = vendorId;
+    }
+
+    // Filter by category
+    if (category === "__uncategorized") {
+      where.OR = [...(where.OR || []), { category: null }, { category: "" }];
+    } else if (category) {
+      where.category = { equals: category, mode: "insensitive" };
     }
 
     if (search) {

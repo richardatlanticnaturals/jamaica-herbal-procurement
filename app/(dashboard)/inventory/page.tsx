@@ -42,6 +42,12 @@ export default function InventoryPage() {
   const [importResult, setImportResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Filter state
+  const [vendorFilter, setVendorFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [stockFilter, setStockFilter] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+
   // Edit dialog state
   const [editItem, setEditItem] = useState<any | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -56,11 +62,14 @@ export default function InventoryPage() {
   const [editVendorId, setEditVendorId] = useState("");
   const [editIsActive, setEditIsActive] = useState(true);
 
-  const loadItems = useCallback(async (p: number, s: string) => {
+  const loadItems = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(p), limit: "50" });
-      if (s) params.set("search", s);
+      const params = new URLSearchParams({ page: String(page), limit: "50" });
+      if (search) params.set("search", search);
+      if (vendorFilter) params.set("vendorId", vendorFilter);
+      if (categoryFilter) params.set("category", categoryFilter);
+      if (stockFilter) params.set("filter", stockFilter);
       const res = await fetch(`/api/inventory?${params}`);
       const data = await res.json();
       setItems(data.items || []);
@@ -71,7 +80,7 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, search, vendorFilter, categoryFilter, stockFilter]);
 
   // Load vendors once for the dropdown
   const loadVendors = useCallback(async () => {
@@ -85,11 +94,17 @@ export default function InventoryPage() {
   }, []);
 
   useEffect(() => {
-    loadItems(page, search);
-  }, [page, search, loadItems]);
+    loadItems();
+  }, [loadItems]);
 
   useEffect(() => {
     loadVendors();
+    // Load distinct categories
+    fetch("/api/categories").then(r => r.json()).then(data => {
+      if (data.categories) {
+        setCategories(data.categories.map((c: any) => c.name).filter(Boolean));
+      }
+    }).catch(() => {});
   }, [loadVendors]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -118,7 +133,6 @@ export default function InventoryPage() {
         setPage(1);
         setSearch("");
         setSearchInput("");
-        loadItems(1, "");
       } else {
         setImportResult(`Error: ${data.error}`);
       }
@@ -168,7 +182,7 @@ export default function InventoryPage() {
         setEditOpen(false);
         setEditItem(null);
         // Refresh data
-        loadItems(page, search);
+        loadItems();
       } else {
         const data = await res.json();
         console.error("Save failed:", data.error);
@@ -210,20 +224,81 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Search */}
-      <form onSubmit={handleSearch} className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search products..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9"
-          />
+      {/* Search and Filters */}
+      <div className="space-y-3">
+        <form onSubmit={handleSearch} className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search products..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button type="submit" variant="outline" size="sm">Search</Button>
+          <Badge variant="secondary">{total} items</Badge>
+        </form>
+
+        {/* Filter Row */}
+        <div className="flex flex-wrap items-end gap-3">
+          {/* Category Filter */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">Category</label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[160px]"
+            >
+              <option value="">All Categories</option>
+              <option value="__uncategorized">Uncategorized</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Vendor Filter */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">Vendor</label>
+            <select
+              value={vendorFilter}
+              onChange={(e) => { setVendorFilter(e.target.value); setPage(1); }}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[160px]"
+            >
+              <option value="">All Vendors</option>
+              {vendors.map((v: any) => (
+                <option key={v.id} value={v.id}>{v.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Stock Filter */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">Stock Status</label>
+            <select
+              value={stockFilter}
+              onChange={(e) => { setStockFilter(e.target.value); setPage(1); }}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[130px]"
+            >
+              <option value="">All Stock</option>
+              <option value="low-stock">Low Stock</option>
+              <option value="out-of-stock">Out of Stock</option>
+            </select>
+          </div>
+
+          {/* Clear Filters */}
+          {(categoryFilter || vendorFilter || stockFilter) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setCategoryFilter(""); setVendorFilter(""); setStockFilter(""); setPage(1); }}
+            >
+              Clear Filters
+            </Button>
+          )}
         </div>
-        <Button type="submit" variant="outline" size="sm">Search</Button>
-        <Badge variant="secondary">{total} items</Badge>
-      </form>
+      </div>
 
       {/* Inventory Table */}
       <Card>

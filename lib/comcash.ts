@@ -297,6 +297,37 @@ export async function fetchAllProducts(
   return allProducts;
 }
 
+// --- Category types ---
+
+export interface ComcashCategory {
+  id: number;
+  title: string;
+  parentId?: number | null;
+}
+
+/**
+ * Fetch product categories from Comcash via the Employee API.
+ * POST /employee/product/categories returns an array of {id, title, parentId}.
+ */
+export async function fetchCategories(): Promise<ComcashCategory[]> {
+  const response = await employeeApiRequest<
+    ComcashCategory[] | { data: ComcashCategory[] }
+  >("/employee/product/categories");
+
+  if (Array.isArray(response)) return response;
+  if (
+    response &&
+    typeof response === "object" &&
+    "data" in response &&
+    Array.isArray(response.data)
+  ) {
+    return response.data;
+  }
+
+  console.warn("[Comcash] Unexpected categories response format:", typeof response);
+  return [];
+}
+
 /**
  * Search for a product by barcode/SKU via the Employee API.
  */
