@@ -160,10 +160,21 @@ const tools: Anthropic.Tool[] = [
   {
     name: "auto_generate_pos",
     description:
-      "Automatically generate DRAFT purchase orders for all items that are below their reorder point. Groups items by vendor. Skips vendors that already have a DRAFT PO.",
+      "Automatically generate DRAFT purchase orders for items below their reorder point. Groups items by vendor. Skips vendors that already have a DRAFT PO. Optionally filter to specific vendors by ID or name.",
     input_schema: {
       type: "object" as const,
-      properties: {},
+      properties: {
+        vendorIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional list of vendor IDs to generate POs for. If omitted, generates for all vendors with low-stock items.",
+        },
+        vendorNames: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional list of vendor names to generate POs for (partial match). If omitted, generates for all vendors.",
+        },
+      },
       required: [],
     },
   },
@@ -386,7 +397,7 @@ async function executeToolCall(
       case "query_vendors": result = await handleQueryVendors(input); break;
       case "query_sales": result = await handleQuerySales(input); break;
       case "create_purchase_order": result = await handleCreatePO(input); break;
-      case "auto_generate_pos": result = await handleAutoGeneratePOs(); break;
+      case "auto_generate_pos": result = await handleAutoGeneratePOs(input); break;
       case "create_smart_po": result = await handleCreateSmartPO(input); break;
       case "get_dashboard_stats": result = await handleDashboardStats(); break;
       case "sync_comcash_vendors": result = await handleSyncVendors(); break;
@@ -839,8 +850,9 @@ async function handleCreateSmartPO(
   }
 
   if (dryRun) {
+    // Fix: order qty = maxStockLevel - currentStock, where maxStockLevel = reorderPoint + reorderQty
     const subtotal = itemsToOrder.reduce(
-      (sum, i) => sum + i.reorderQty * Number(i.costPrice), 0
+      (sum, i) => sum + Math.max(1, (i.reorderPoint + i.reorderQty) - i.currentStock) * Number(i.costPrice), 0
     );
     return JSON.stringify({
       dryRun: true,
@@ -852,7 +864,7 @@ async function handleCreateSmartPO(
       sampleItems: itemsToOrder.slice(0, 15).map((i) => ({
         name: i.name,
         stock: i.currentStock,
-        reorder: i.reorderQty,
+        orderQty: Math.max(1, (i.reorderPoint + i.reorderQty) - i.currentStock),
         cost: Number(i.costPrice),
       })),
       excludedSample: excluded.slice(0, 10),
@@ -870,14 +882,18 @@ async function handleCreateSmartPO(
 
     const poNumber = `${settings.poNumberPrefix}-${new Date().getFullYear()}-${String(settings.nextPoSequence).padStart(4, "0")}`;
 
-    const lineItems = itemsToOrder.map((item) => ({
-      inventoryItemId: item.id,
-      vendorSku: item.vendorSku || null,
-      description: item.name,
-      qtyOrdered: item.reorderQty,
-      unitCost: Number(item.costPrice),
-      lineTotal: item.reorderQty * Number(item.costPrice),
-    }));
+    // Fix: order qty = maxStockLevel - currentStock
+    const lineItems = itemsToOrder.map((item) => {
+      const qtyOrdered = Math.max(1, (item.reorderPoint + item.reorderQty) - item.currentStock);
+      return {
+        inventoryItemId: item.id,
+        vendorSku: item.vendorSku || null,
+        description: item.name,
+        qtyOrdered,
+        unitCost: Number(item.costPrice),
+        lineTotal: qtyOrdered * Number(item.costPrice),
+      };
+    });
 
     const subtotal = lineItems.reduce((sum, li) => sum + li.lineTotal, 0);
 
@@ -975,14 +991,18 @@ async function handleAutoGeneratePOs(): Promise<string> {
       const poNumber = `${settings.poNumberPrefix}-${year}-${String(nextSeq).padStart(4, "0")}`;
       nextSeq++;
 
-      const lineItems = items.map((item) => ({
-        inventoryItemId: item.id,
-        vendorSku: item.vendorSku || null,
-        description: item.name,
-        qtyOrdered: item.reorderQty,
-        unitCost: Number(item.costPrice),
-        lineTotal: item.reorderQty * Number(item.costPrice),
-      }));
+      // Fix: order qty = maxStockLevel - currentStock
+      const lineItems = items.map((item) => {
+        const qtyOrdered = Math.max(1, (item.reorderPoint + item.reorderQty) - item.currentStock);
+        return {
+          inventoryItemId: item.id,
+          vendorSku: item.vendorSku || null,
+          description: item.name,
+          qtyOrdered,
+          unitCost: Number(item.costPrice),
+          lineTotal: qtyOrdered * Number(item.costPrice),
+        };
+      });
 
       const subtotal = lineItems.reduce(
         (sum, li) => sum + li.lineTotal,

@@ -50,12 +50,103 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    // Fix: Check if PO exists before updating to return proper 404
-    const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
+    // Check if PO exists before updating
+    const existing = await prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: { lineItems: true },
+    });
     if (!existing) {
       return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
     }
 
+    // Only allow edits on DRAFT and APPROVED POs
+    if (!["DRAFT", "APPROVED"].includes(existing.status)) {
+      return NextResponse.json(
+        { error: `Cannot edit a PO with status ${existing.status}. Only DRAFT and APPROVED POs can be edited.` },
+        { status: 400 }
+      );
+    }
+
+    // If lineItems are provided, do a full line-item update inside a transaction
+    if (body.lineItems) {
+      const po = await prisma.$transaction(async (tx) => {
+        // Delete removed line items: find IDs in existing that are NOT in the update payload
+        const incomingIds = new Set(
+          body.lineItems
+            .filter((li: { id?: string }) => li.id)
+            .map((li: { id: string }) => li.id)
+        );
+        const toDelete = existing.lineItems
+          .filter((li) => !incomingIds.has(li.id))
+          .map((li) => li.id);
+
+        if (toDelete.length > 0) {
+          await tx.pOLineItem.deleteMany({ where: { id: { in: toDelete } } });
+        }
+
+        // Upsert existing + create new line items
+        for (const li of body.lineItems) {
+          const lineTotal = (li.qtyOrdered || 1) * (li.unitCost || 0);
+          if (li.id) {
+            // Update existing line item
+            await tx.pOLineItem.update({
+              where: { id: li.id },
+              data: {
+                qtyOrdered: li.qtyOrdered,
+                unitCost: li.unitCost,
+                lineTotal,
+                vendorSku: li.vendorSku ?? undefined,
+                description: li.description ?? undefined,
+              },
+            });
+          } else {
+            // Create new line item
+            await tx.pOLineItem.create({
+              data: {
+                purchaseOrderId: id,
+                inventoryItemId: li.inventoryItemId,
+                vendorSku: li.vendorSku || null,
+                description: li.description,
+                qtyOrdered: li.qtyOrdered || 1,
+                unitCost: li.unitCost || 0,
+                lineTotal,
+              },
+            });
+          }
+        }
+
+        // Recalculate subtotal and total
+        const allLines = await tx.pOLineItem.findMany({
+          where: { purchaseOrderId: id },
+        });
+        const subtotal = allLines.reduce((sum, li) => sum + Number(li.lineTotal), 0);
+
+        // Update PO with new totals and optional fields
+        return await tx.purchaseOrder.update({
+          where: { id },
+          data: {
+            subtotal,
+            total: subtotal + Number(existing.tax) + Number(existing.shipping),
+            notes: body.notes !== undefined ? body.notes : undefined,
+          },
+          include: {
+            vendor: true,
+            lineItems: {
+              include: {
+                inventoryItem: {
+                  select: { id: true, name: true, sku: true, currentStock: true },
+                },
+              },
+            },
+            statusHistory: { orderBy: { createdAt: "asc" } },
+          },
+        });
+      });
+
+      return NextResponse.json({ po });
+    }
+
+    // Simple update (notes/locationCode only)
     const po = await prisma.purchaseOrder.update({
       where: { id },
       data: {
@@ -64,7 +155,14 @@ export async function PUT(
       },
       include: {
         vendor: true,
-        lineItems: { include: { inventoryItem: true } },
+        lineItems: {
+          include: {
+            inventoryItem: {
+              select: { id: true, name: true, sku: true, currentStock: true },
+            },
+          },
+        },
+        statusHistory: { orderBy: { createdAt: "asc" } },
       },
     });
 

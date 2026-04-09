@@ -41,6 +41,8 @@ interface InventoryItem {
   sku: string;
   name: string;
   currentStock: number;
+  reorderPoint: number;
+  reorderQty: number;
   costPrice: number | string;
   vendorId: string | null;
   vendorSku: string | null;
@@ -138,6 +140,9 @@ export default function NewPurchaseOrderPage() {
     // Prevent duplicates
     if (lineItems.some((li) => li.inventoryItemId === item.id)) return;
 
+    // Default qty = maxStockLevel - currentStock, where maxStockLevel = reorderPoint + reorderQty
+    const defaultQty = Math.max(1, (item.reorderPoint + item.reorderQty) - item.currentStock);
+
     setLineItems((prev) => [
       ...prev,
       {
@@ -146,7 +151,7 @@ export default function NewPurchaseOrderPage() {
         name: item.name,
         vendorSku: item.vendorSku,
         description: item.name,
-        qtyOrdered: 1,
+        qtyOrdered: defaultQty,
         unitCost: Number(item.costPrice) || 0,
         unitOfMeasure: item.unitOfMeasure,
       },

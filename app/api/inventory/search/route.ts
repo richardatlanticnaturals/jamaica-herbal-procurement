@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
         sku: true,
         name: true,
         currentStock: true,
+        reorderPoint: true,
+        reorderQty: true,
         costPrice: true,
         vendorId: true,
         vendorSku: true,

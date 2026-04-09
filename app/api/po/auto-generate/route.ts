@@ -1,19 +1,34 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const authError = await requireAuth();
   if (authError) return authError;
 
   try {
-    // Fix #6: Remove hardcoded stock threshold — fetch all active items with a vendor
-    // and let the in-memory filter compare currentStock to each item's reorderPoint.
+    // Parse optional vendorIds from request body
+    let vendorIds: string[] | null = null;
+    try {
+      const body = await request.json();
+      if (body.vendorIds && Array.isArray(body.vendorIds) && body.vendorIds.length > 0) {
+        vendorIds = body.vendorIds;
+      }
+    } catch {
+      // No body or invalid JSON -- generate for all vendors
+    }
+
+    // Fetch active items with a vendor, optionally filtered by vendorIds
+    const itemWhere: any = {
+      isActive: true,
+      vendorId: { not: null },
+    };
+    if (vendorIds) {
+      itemWhere.vendorId = { in: vendorIds };
+    }
+
     const allItems = await prisma.inventoryItem.findMany({
-      where: {
-        isActive: true,
-        vendorId: { not: null },
-      },
+      where: itemWhere,
       include: {
         vendor: true,
       },
@@ -75,14 +90,18 @@ export async function POST() {
         const poNumber = `${settings.poNumberPrefix}-${year}-${String(nextSeq).padStart(4, "0")}`;
         nextSeq++;
 
-        const lineItems = items.map((item) => ({
-          inventoryItemId: item.id,
-          vendorSku: item.vendorSku || null,
-          description: item.name,
-          qtyOrdered: item.reorderQty,
-          unitCost: Number(item.costPrice),
-          lineTotal: item.reorderQty * Number(item.costPrice),
-        }));
+        // Fix: order qty = maxStockLevel - currentStock, where maxStockLevel = reorderPoint + reorderQty
+        const lineItems = items.map((item) => {
+          const qtyOrdered = Math.max(1, (item.reorderPoint + item.reorderQty) - item.currentStock);
+          return {
+            inventoryItemId: item.id,
+            vendorSku: item.vendorSku || null,
+            description: item.name,
+            qtyOrdered,
+            unitCost: Number(item.costPrice),
+            lineTotal: qtyOrdered * Number(item.costPrice),
+          };
+        });
 
         const subtotal = lineItems.reduce((sum, li) => sum + li.lineTotal, 0);
 
@@ -129,5 +148,68 @@ export async function POST() {
   } catch (error) {
     console.error("Auto-generate POs failed:", error);
     return NextResponse.json({ error: "Failed to auto-generate POs" }, { status: 500 });
+  }
+}
+
+/**
+ * GET /api/po/auto-generate
+ * Returns a list of vendors that have low-stock items, with counts.
+ * Used by the vendor selection dialog before auto-generating.
+ */
+export async function GET() {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
+  try {
+    const allItems = await prisma.inventoryItem.findMany({
+      where: { isActive: true, vendorId: { not: null } },
+      include: { vendor: { select: { id: true, name: true } } },
+    });
+
+    const lowStockItems = allItems.filter(
+      (item) => item.currentStock <= item.reorderPoint
+    );
+
+    // Group by vendor and count
+    const vendorMap = new Map<string, { id: string; name: string; lowStockCount: number }>();
+    for (const item of lowStockItems) {
+      if (!item.vendorId || !item.vendor) continue;
+      const existing = vendorMap.get(item.vendorId);
+      if (existing) {
+        existing.lowStockCount++;
+      } else {
+        vendorMap.set(item.vendorId, {
+          id: item.vendor.id,
+          name: item.vendor.name,
+          lowStockCount: 1,
+        });
+      }
+    }
+
+    // Check which vendors already have DRAFT POs
+    const existingDraftVendorIds = new Set(
+      (
+        await prisma.purchaseOrder.findMany({
+          where: { status: "DRAFT", vendorId: { in: Array.from(vendorMap.keys()) } },
+          select: { vendorId: true },
+        })
+      ).map((po) => po.vendorId)
+    );
+
+    const vendors = Array.from(vendorMap.values()).map((v) => ({
+      ...v,
+      hasDraftPO: existingDraftVendorIds.has(v.id),
+    }));
+
+    // Sort by name
+    vendors.sort((a, b) => a.name.localeCompare(b.name));
+
+    return NextResponse.json({
+      vendors,
+      totalLowStockItems: lowStockItems.length,
+    });
+  } catch (error) {
+    console.error("Failed to fetch low-stock vendor data:", error);
+    return NextResponse.json({ error: "Failed to fetch vendor data" }, { status: 500 });
   }
 }

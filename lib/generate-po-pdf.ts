@@ -1,5 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import fs from "fs";
+import path from "path";
 
 interface LineItem {
   description: string;
@@ -33,34 +35,49 @@ export function generatePOPdf(po: PO): Buffer {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  // Header — Jamaica Herbal branding
-  doc.setFillColor(0, 155, 58); // brand green
-  doc.rect(0, 0, pageWidth, 36, "F");
+  // Header — Jamaica Herbal branding with off-white background
+  doc.setFillColor(248, 247, 244); // off-white #F8F7F4 (matches app theme)
+  doc.rect(0, 0, pageWidth, 40, "F");
 
-  doc.setTextColor(255, 184, 28); // brand gold
-  doc.setFontSize(22);
-  doc.setFont("helvetica", "bold");
-  doc.text("JAMAICA HERBAL", 14, 16);
+  // Add logo image
+  try {
+    const logoPath = path.join(process.cwd(), "public", "jh-logo.png");
+    const logoData = fs.readFileSync(logoPath);
+    const logoBase64 = logoData.toString("base64");
+    doc.addImage(`data:image/png;base64,${logoBase64}`, "PNG", 14, 6, 70, 28);
+  } catch {
+    // Fallback text if logo not found
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("JAMAICA", 14, 18);
+    doc.setTextColor(0, 155, 58);
+    doc.text("HERBAL", 58, 18);
+  }
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(10);
+  // Green accent bar below header
+  doc.setFillColor(0, 155, 58);
+  doc.rect(0, 40, pageWidth, 3, "F");
+
+  doc.setTextColor(100, 100, 100);
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text("Purchase Order", 14, 24);
-  doc.text("Lauderdale Lakes, FL | North Lauderdale, FL", 14, 30);
+  doc.text("Lauderdale Lakes, FL | North Lauderdale, FL | (954) 854-2195", 14, 38);
 
-  // PO Number badge
-  doc.setFontSize(14);
+  // PO Number and details — right side of header
+  doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(255, 255, 255);
-  doc.text(po.poNumber, pageWidth - 14, 16, { align: "right" });
+  doc.setTextColor(0, 155, 58); // green
+  doc.text(po.poNumber, pageWidth - 14, 14, { align: "right" });
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text(`Status: ${po.status.replace(/_/g, " ")}`, pageWidth - 14, 24, { align: "right" });
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Status: ${po.status.replace(/_/g, " ")}`, pageWidth - 14, 22, { align: "right" });
   doc.text(
     `Date: ${new Date(po.createdAt).toLocaleDateString()}`,
     pageWidth - 14,
-    30,
+    28,
     { align: "right" }
   );
 
@@ -68,7 +85,7 @@ export function generatePOPdf(po: PO): Buffer {
   doc.setTextColor(26, 26, 26);
 
   // Vendor info box
-  let y = 46;
+  let y = 52;
   doc.setFillColor(245, 245, 245);
   doc.roundedRect(14, y - 4, pageWidth - 28, 34, 2, 2, "F");
 
@@ -120,9 +137,17 @@ export function generatePOPdf(po: PO): Buffer {
   doc.setTextColor(26, 26, 26);
   doc.text(po.orderMethod, pageWidth - 65, y + 25);
 
-  y = 88;
+  y = 94;
 
   // Line items table
+  if (po.lineItems.length === 0) {
+    doc.setFontSize(10);
+    doc.setTextColor(150, 150, 150);
+    doc.text("No line items — this PO was imported from Comcash without item details.", 14, y + 6);
+    doc.text(`PO Total: $${Number(po.total).toFixed(2)}`, 14, y + 14);
+    y += 24;
+  }
+
   const tableData = po.lineItems.map((item, i) => [
     String(i + 1),
     item.inventoryItem?.sku || item.vendorSku || "—",
@@ -132,7 +157,7 @@ export function generatePOPdf(po: PO): Buffer {
     `$${Number(item.lineTotal).toFixed(2)}`,
   ]);
 
-  autoTable(doc, {
+  if (tableData.length > 0) autoTable(doc, {
     startY: y,
     head: [["#", "SKU", "Description", "Qty", "Unit Cost", "Total"]],
     body: tableData,
@@ -162,7 +187,7 @@ export function generatePOPdf(po: PO): Buffer {
   });
 
   // Totals
-  const finalY = (doc as any).lastAutoTable?.finalY || y + 20;
+  const finalY = (doc as any).lastAutoTable?.finalY || y;
   const totalsY = finalY + 8;
 
   doc.setDrawColor(200, 200, 200);
