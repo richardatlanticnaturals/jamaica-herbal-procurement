@@ -284,7 +284,7 @@ const tools: Anthropic.Tool[] = [
 // Safety cap: truncate tool results to prevent token explosions
 const MAX_TOOL_RESULT_CHARS = 4000;
 function capResult(json: string): string {
-  if (json.length <= MAX_TOOL_RESULT_CHARS) return json;
+  if (!json || json.length <= MAX_TOOL_RESULT_CHARS) return json || "{}";
   // Try to parse and limit array items
   try {
     const obj = JSON.parse(json);
@@ -297,8 +297,19 @@ function capResult(json: string): string {
     }
     const trimmed = JSON.stringify(obj);
     if (trimmed.length <= MAX_TOOL_RESULT_CHARS) return trimmed;
-  } catch {}
-  return json.slice(0, MAX_TOOL_RESULT_CHARS) + '..."truncated"}';
+    // Still too large — aggressively trim arrays to 5
+    for (const key of Object.keys(obj)) {
+      if (Array.isArray(obj[key]) && obj[key].length > 5) {
+        const total = obj[key].length;
+        obj[key] = obj[key].slice(0, 5);
+        obj[key + "_note"] = `Showing 5 of ${total}. Ask for more with higher limit.`;
+      }
+    }
+    return JSON.stringify(obj).slice(0, MAX_TOOL_RESULT_CHARS);
+  } catch {
+    // Not valid JSON — return a safe truncated JSON object
+    return JSON.stringify({ data: json.slice(0, MAX_TOOL_RESULT_CHARS - 50), truncated: true });
+  }
 }
 
 async function executeToolCall(
@@ -355,11 +366,11 @@ async function handleQueryInventory(
     where.vendorId = vendorId;
   }
 
-  // Fetch all for in-memory filtering when needed
-  const needsInMemoryFilter =
-    status === "low_stock" || status === "out_of_stock";
+  // low_stock needs in-memory filter because reorderPoint varies per item.
+  // out_of_stock can be filtered at the DB level for efficiency.
+  const needsInMemoryFilter = status === "low_stock";
 
-  if (status === "out_of_stock" && !needsInMemoryFilter) {
+  if (status === "out_of_stock") {
     where.currentStock = { lte: 0 };
   }
 
@@ -1028,6 +1039,7 @@ async function handleSyncInventoryToComcash(
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              OPEN_API_KEY: COMCASH_OPENAPI_KEY,
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
@@ -1153,21 +1165,21 @@ async function handleBulkUpdateInventory(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {};
 
-  if (filter.category) {
-    where.category = { contains: filter.category, mode: "insensitive" };
-  }
+  // categoryEmpty and category are mutually exclusive — categoryEmpty takes precedence
   if (filter.categoryEmpty) {
     where.OR = [
       { category: null },
       { category: "" },
       { category: "Uncategorized" },
     ];
+  } else if (filter.category) {
+    where.category = { contains: filter.category, mode: "insensitive" };
   }
-  if (filter.vendorId) {
-    where.vendorId = filter.vendorId;
-  }
+  // vendorEmpty and vendorId are mutually exclusive — vendorEmpty takes precedence
   if (filter.vendorEmpty) {
     where.vendorId = null;
+  } else if (filter.vendorId) {
+    where.vendorId = filter.vendorId;
   }
   if (filter.stockBelow !== undefined) {
     where.currentStock = { ...(where.currentStock || {}), lt: filter.stockBelow };
