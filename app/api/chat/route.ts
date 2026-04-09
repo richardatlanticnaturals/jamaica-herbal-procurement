@@ -31,7 +31,8 @@ SALES DATA:
 - NEVER say "I don't have access to sales data" — always try search_sales first.
 STOCK LEVELS: When answering stock level questions, always call refresh_stock first to ensure data is current. Tell the user "Refreshing stock from POS..." before showing results.
 PO STATUSES: DRAFT (not sent), PENDING_APPROVAL (needs approval), APPROVED (ready to send), SENT (sent to vendor, awaiting delivery), CONFIRMED (vendor confirmed), PARTIALLY_RECEIVED (some items received), RECEIVED (all received), CANCELLED, CLOSED. When user says "pending POs", they mean active undelivered POs: use status SENT or query with no status filter and explain the breakdown.
-Categories: Herbs & Teas, Vitamins & Supplements, Essential Oils, Hair & Beauty, Body Care, Food & Beverages, Incense & Spiritual, Accessories.
+Categories (from Comcash POS): Jamaica Herbal Products, Grocery, Herbs, Skin Care, Vitamins, Sea Moss Gel, Digestive Health, Mens Health, Womens Health, Essential Oils, Cold and Flu, Teas, Juice Bar, Hair Care, Heart Health, Superfoods and Greens, Detox, CBD, Tonics, Joint Support, Nuts and Seeds, Sleep and Stress Relief, Atlantic Naturals Products, Incense, Brain Health, Oral Care, Ethnic Products, Weight Loss, Blood Sugar Support, Patties, Acai, Coffee, Blood Pressure Support, Body Building, Hot Tea Beverage.
+When searching for items or categories, use the query_inventory tool with the category or search param. Use partial matches — e.g. category: "Herb" will match "Herbs".
 SMART POs: When asked to create a PO for a vendor (especially excluding slow movers), use create_smart_po. It handles everything server-side in one call. Do NOT manually query inventory then create a PO — use create_smart_po instead.
 PO STATUSES: DRAFT=new, APPROVED=ready to send, SENT=emailed to vendor, CONFIRMED=vendor confirmed, PARTIALLY_RECEIVED=some items arrived, RECEIVED=all arrived, CLOSED=completed.`;
 
@@ -495,6 +496,7 @@ async function handleQueryInventory(
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
       { sku: { contains: search, mode: "insensitive" } },
+      { category: { contains: search, mode: "insensitive" } },
     ];
   }
 
