@@ -267,9 +267,12 @@ const tools: Anthropic.Tool[] = [
           type: "object",
           description: "Filter criteria to select items. All conditions must match (AND).",
           properties: {
+            nameContains: { type: "string", description: "Match items whose name contains this text (case-insensitive)" },
+            skuContains: { type: "string", description: "Match items whose SKU contains this text" },
             category: { type: "string", description: "Match items with this category (case-insensitive contains)" },
             categoryEmpty: { type: "boolean", description: "If true, match items with empty/null category" },
             vendorId: { type: "string", description: "Match items from this vendor" },
+            vendorName: { type: "string", description: "Match items from vendor with this name (searches)" },
             vendorEmpty: { type: "boolean", description: "If true, match items with no vendor assigned" },
             stockBelow: { type: "number", description: "Match items with currentStock below this number" },
             stockAbove: { type: "number", description: "Match items with currentStock above this number" },
@@ -2025,9 +2028,12 @@ async function handleBulkUpdateInventory(
   input: Record<string, unknown>
 ): Promise<string> {
   const filter = (input.filter || {}) as {
+    nameContains?: string;
+    skuContains?: string;
     category?: string;
     categoryEmpty?: boolean;
     vendorId?: string;
+    vendorName?: string;
     vendorEmpty?: boolean;
     stockBelow?: number;
     stockAbove?: number;
@@ -2048,6 +2054,25 @@ async function handleBulkUpdateInventory(
   // Build Prisma where clause from filter
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {};
+
+  // Name/SKU search
+  if (filter.nameContains) {
+    where.name = { contains: filter.nameContains, mode: "insensitive" };
+  }
+  if (filter.skuContains) {
+    where.sku = { contains: filter.skuContains, mode: "insensitive" };
+  }
+
+  // Vendor name resolution
+  if (filter.vendorName && !filter.vendorId && !filter.vendorEmpty) {
+    const vendor = await prisma.vendor.findFirst({
+      where: { name: { contains: filter.vendorName, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (vendor) {
+      where.vendorId = vendor.id;
+    }
+  }
 
   // categoryEmpty and category are mutually exclusive — categoryEmpty takes precedence
   if (filter.categoryEmpty) {
