@@ -71,6 +71,9 @@ export default function PODetailPage() {
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  // Multi-select for bulk delete
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+
   // Add-item search state
   const [showAddItem, setShowAddItem] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
@@ -114,6 +117,7 @@ export default function PODetailPage() {
     setShowAddItem(false);
     setItemSearch("");
     setItemSearchResults([]);
+    setSelectedItems(new Set());
   };
 
   const cancelEditing = () => {
@@ -138,6 +142,29 @@ export default function PODetailPage() {
 
   const removeEditItem = (index: number) => {
     setEditLineItems((prev) => prev.filter((_, i) => i !== index));
+    setSelectedItems((prev) => { const n = new Set<number>(); prev.forEach(i => { if (i < index) n.add(i); else if (i > index) n.add(i - 1); }); return n; });
+  };
+
+  const toggleSelectItem = (index: number) => {
+    setSelectedItems((prev) => {
+      const n = new Set(prev);
+      if (n.has(index)) n.delete(index); else n.add(index);
+      return n;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === editLineItems.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(editLineItems.map((_, i) => i)));
+    }
+  };
+
+  const removeSelectedItems = () => {
+    if (selectedItems.size === 0) return;
+    setEditLineItems((prev) => prev.filter((_, i) => !selectedItems.has(i)));
+    setSelectedItems(new Set());
   };
 
   // --- Add item search (debounced) ---
@@ -491,10 +518,32 @@ export default function PODetailPage() {
               </div>
             )}
 
+            {/* Bulk delete bar */}
+            {selectedItems.size > 0 && (
+              <div className="flex items-center gap-3 mb-3 p-2 bg-red-50 rounded-md border border-red-200">
+                <span className="text-sm font-medium text-red-700">{selectedItems.size} item{selectedItems.size > 1 ? "s" : ""} selected</span>
+                <Button size="sm" variant="destructive" onClick={removeSelectedItems} className="h-7">
+                  <Trash2 className="mr-1 h-3 w-3" />
+                  Delete Selected
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelectedItems(new Set())} className="h-7 text-xs">
+                  Clear
+                </Button>
+              </div>
+            )}
+
             {/* Editable line items table */}
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <input
+                      type="checkbox"
+                      checked={editLineItems.length > 0 && selectedItems.size === editLineItems.length}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                  </TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-center">Stock</TableHead>
@@ -506,7 +555,15 @@ export default function PODetailPage() {
               </TableHeader>
               <TableBody>
                 {editLineItems.map((item, index) => (
-                  <TableRow key={item.id || `new-${item.inventoryItemId}`}>
+                  <TableRow key={item.id || `new-${item.inventoryItemId}`} className={selectedItems.has(index) ? "bg-red-50" : ""}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.has(index)}
+                        onChange={() => toggleSelectItem(index)}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-xs">
                       {item.inventoryItem?.sku || "--"}
                     </TableCell>
