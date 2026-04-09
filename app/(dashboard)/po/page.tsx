@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileText, Plus, Zap, ChevronLeft, ChevronRight, Search, Download, X, Loader2 } from "lucide-react";
+import { FileText, Plus, Zap, ChevronLeft, ChevronRight, Search, Download, X, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700",
@@ -48,6 +48,19 @@ interface VendorLowStock {
   hasDraftPO: boolean;
 }
 
+// --- Sortable column types ---
+type SortField = "poNumber" | "vendor" | "status" | "items" | "total" | "createdAt";
+type SortDirection = "asc" | "desc" | null;
+
+function SortIcon({ field, activeField, direction }: { field: SortField; activeField: SortField | null; direction: SortDirection }) {
+  if (activeField !== field || !direction) {
+    return <ArrowUpDown className="ml-1 h-3 w-3 text-muted-foreground/40" />;
+  }
+  return direction === "asc"
+    ? <ArrowUp className="ml-1 h-3 w-3 text-foreground" />
+    : <ArrowDown className="ml-1 h-3 w-3 text-foreground" />;
+}
+
 export default function PurchaseOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -70,6 +83,54 @@ export default function PurchaseOrdersPage() {
   const [vendorOptionsLoading, setVendorOptionsLoading] = useState(false);
   const [selectedVendorIds, setSelectedVendorIds] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(true);
+
+  // Sort state -- client-side sorting on current page data
+  const [sortField, setSortField] = useState<SortField | null>("createdAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Cycle: asc -> desc -> no sort
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortField(null);
+        setSortDirection(null);
+      } else {
+        setSortDirection("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  // Client-side sort of current page orders
+  const sortedOrders = [...orders].sort((a, b) => {
+    if (!sortField || !sortDirection) return 0;
+    let cmp = 0;
+    switch (sortField) {
+      case "poNumber":
+        cmp = (a.poNumber || "").localeCompare(b.poNumber || "");
+        break;
+      case "vendor":
+        cmp = (a.vendor?.name || "").localeCompare(b.vendor?.name || "");
+        break;
+      case "status":
+        cmp = (a.status || "").localeCompare(b.status || "");
+        break;
+      case "items":
+        cmp = (a._count?.lineItems || 0) - (b._count?.lineItems || 0);
+        break;
+      case "total":
+        cmp = Number(a.total) - Number(b.total);
+        break;
+      case "createdAt":
+        cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        break;
+    }
+    return sortDirection === "asc" ? cmp : -cmp;
+  });
 
   // Debounce search input -- 400ms delay
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -369,16 +430,41 @@ export default function PurchaseOrdersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>PO Number</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-center">Items</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Created</TableHead>
+                    {/* Sortable column headers */}
+                    <TableHead>
+                      <button onClick={() => toggleSort("poNumber")} className="flex items-center hover:text-foreground transition-colors">
+                        PO Number <SortIcon field="poNumber" activeField={sortField} direction={sortDirection} />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => toggleSort("vendor")} className="flex items-center hover:text-foreground transition-colors">
+                        Vendor <SortIcon field="vendor" activeField={sortField} direction={sortDirection} />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => toggleSort("status")} className="flex items-center hover:text-foreground transition-colors">
+                        Status <SortIcon field="status" activeField={sortField} direction={sortDirection} />
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <button onClick={() => toggleSort("items")} className="flex items-center justify-center w-full hover:text-foreground transition-colors">
+                        Items <SortIcon field="items" activeField={sortField} direction={sortDirection} />
+                      </button>
+                    </TableHead>
+                    <TableHead className="text-right">
+                      <button onClick={() => toggleSort("total")} className="flex items-center justify-end w-full hover:text-foreground transition-colors">
+                        Total <SortIcon field="total" activeField={sortField} direction={sortDirection} />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button onClick={() => toggleSort("createdAt")} className="flex items-center hover:text-foreground transition-colors">
+                        Created <SortIcon field="createdAt" activeField={sortField} direction={sortDirection} />
+                      </button>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orders.map((po) => (
+                  {sortedOrders.map((po) => (
                     <TableRow key={po.id} className="cursor-pointer hover:bg-muted/50">
                       <TableCell>
                         <Link href={`/po/${po.id}`} className="font-mono text-sm font-medium text-blue-600 hover:underline">
