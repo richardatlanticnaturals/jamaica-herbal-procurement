@@ -1024,7 +1024,7 @@ async function handleCreateSmartPO(
 ): Promise<string> {
   const vendorName = (input.vendorName as string) || "";
   const vendorId = (input.vendorId as string) || "";
-  const excludeSlowMonths = (input.excludeSlowMonths as number) || 0;
+  const excludeSlowMonths = (input.excludeSlowMonths as number) || 4; // Always exclude slow movers by default
   const notes = (input.notes as string) || "";
   const dryRun = (input.dryRun as boolean) ?? true;
 
@@ -1092,10 +1092,20 @@ async function handleCreateSmartPO(
     });
   }
 
+  // Fetch sales velocity data for qty calculation: qtySoldLast4Months + 2, minimum 2
+  const orderSkus = itemsToOrder.map((i) => i.sku).filter(Boolean);
+  const fourMonthsAgoPO = new Date();
+  fourMonthsAgoPO.setMonth(fourMonthsAgoPO.getMonth() - 4);
+  const velocityData = await prisma.productSales.findMany({
+    where: { sku: { in: orderSkus }, lastSoldAt: { gte: fourMonthsAgoPO } },
+    select: { sku: true, totalQtySold: true },
+  });
+  const velocityMap = new Map<string, number>(velocityData.map((s) => [s.sku, s.totalQtySold]));
+
   if (dryRun) {
-    // Fix: order qty = maxStockLevel - currentStock, where maxStockLevel = reorderPoint + reorderQty
+    // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
     const subtotal = itemsToOrder.reduce(
-      (sum, i) => sum + Math.min(i.reorderQty, Math.max(1, (i.reorderPoint + i.reorderQty) - Math.max(0, i.currentStock))) * Number(i.costPrice), 0
+      (sum, i) => sum + Math.max(2, (velocityMap.get(i.sku) || 0) + 2) * Number(i.costPrice), 0
     );
     return JSON.stringify({
       dryRun: true,
@@ -1107,7 +1117,7 @@ async function handleCreateSmartPO(
       sampleItems: itemsToOrder.slice(0, 15).map((i) => ({
         name: i.name,
         stock: i.currentStock,
-        orderQty: Math.min(i.reorderQty, Math.max(1, (i.reorderPoint + i.reorderQty) - Math.max(0, i.currentStock))),
+        orderQty: Math.max(2, (velocityMap.get(i.sku) || 0) + 2),
         cost: Number(i.costPrice),
       })),
       excludedSample: excluded.slice(0, 10),
@@ -1125,9 +1135,9 @@ async function handleCreateSmartPO(
 
     const poNumber = `${settings.poNumberPrefix}-${new Date().getFullYear()}-${String(settings.nextPoSequence).padStart(4, "0")}`;
 
-    // Fix: order qty capped at reorderQty, negative stock treated as 0
+    // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
     const lineItems = itemsToOrder.map((item) => {
-      const qtyOrdered = Math.min(item.reorderQty, Math.max(1, (item.reorderPoint + item.reorderQty) - Math.max(0, item.currentStock)));
+      const qtyOrdered = Math.max(2, (velocityMap.get(item.sku) || 0) + 2);
       return {
         inventoryItemId: item.id,
         vendorSku: item.vendorSku || null,
@@ -1251,15 +1261,29 @@ async function handleAutoGeneratePOs(input: Record<string, unknown> = {}): Promi
       ).map((po) => po.vendorId)
     );
 
+    // Fetch sales velocity data for qty calculation
+    const allReorderSkus = itemsNeedingReorder.map((i) => i.sku).filter(Boolean);
+    const fourMonthsAgoAuto = new Date();
+    fourMonthsAgoAuto.setMonth(fourMonthsAgoAuto.getMonth() - 4);
+    const autoSalesData = await tx.productSales.findMany({
+      where: { sku: { in: allReorderSkus }, lastSoldAt: { gte: fourMonthsAgoAuto } },
+      select: { sku: true, totalQtySold: true },
+    });
+    const autoSalesMap = new Map<string, number>(autoSalesData.map((s) => [s.sku, s.totalQtySold]));
+
     for (const [vendorId, items] of byVendor) {
       if (existingDraftVendorIds.has(vendorId)) continue;
+
+      // Exclude slow movers (0 sales in 4 months)
+      const activeItems = items.filter((item) => (autoSalesMap.get(item.sku) || 0) > 0);
+      if (activeItems.length === 0) continue;
 
       const poNumber = `${settings.poNumberPrefix}-${year}-${String(nextSeq).padStart(4, "0")}`;
       nextSeq++;
 
-      // Fix: order qty capped at reorderQty, negative stock treated as 0
-      const lineItems = items.map((item) => {
-        const qtyOrdered = Math.min(item.reorderQty, Math.max(1, (item.reorderPoint + item.reorderQty) - Math.max(0, item.currentStock)));
+      // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
+      const lineItems = activeItems.map((item) => {
+        const qtyOrdered = Math.max(2, (autoSalesMap.get(item.sku) || 0) + 2);
         return {
           inventoryItemId: item.id,
           vendorSku: item.vendorSku || null,
@@ -1282,7 +1306,7 @@ async function handleAutoGeneratePOs(input: Record<string, unknown> = {}): Promi
           status: "DRAFT",
           subtotal,
           total: subtotal,
-          orderMethod: items[0].vendor?.orderMethod || "EMAIL",
+          orderMethod: activeItems[0].vendor?.orderMethod || "EMAIL",
           createdBy: "ai-chat",
           lineItems: { create: lineItems },
           statusHistory: {

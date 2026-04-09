@@ -46,6 +46,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Fetch sales data for all items needing reorder to calculate qty from sales velocity
+    const reorderSkus = itemsNeedingReorder.map((i) => i.sku).filter(Boolean);
+    const fourMonthsAgo = new Date();
+    fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 4);
+    const salesRecords = await prisma.productSales.findMany({
+      where: { sku: { in: reorderSkus }, lastSoldAt: { gte: fourMonthsAgo } },
+      select: { sku: true, totalQtySold: true },
+    });
+    // Build salesMap: sku -> totalQtySold (last 4 months)
+    const salesMap = new Map<string, number>(salesRecords.map((s) => [s.sku, s.totalQtySold]));
+
     // Group by vendor
     const byVendor = new Map<string, typeof itemsNeedingReorder>();
     for (const item of itemsNeedingReorder) {
@@ -90,9 +101,13 @@ export async function POST(request: NextRequest) {
         const poNumber = `${settings.poNumberPrefix}-${year}-${String(nextSeq).padStart(4, "0")}`;
         nextSeq++;
 
-        // Fix: order qty capped at reorderQty, negative stock treated as 0
-        const lineItems = items.map((item) => {
-          const qtyOrdered = Math.min(item.reorderQty, Math.max(1, (item.reorderPoint + item.reorderQty) - Math.max(0, item.currentStock)));
+        // Exclude slow movers (0 sales in last 4 months) — never auto-add them to POs
+        const activeItems = items.filter((item) => (salesMap.get(item.sku) || 0) > 0);
+        if (activeItems.length === 0) continue; // Skip vendor if all items are slow movers
+
+        // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
+        const lineItems = activeItems.map((item) => {
+          const qtyOrdered = Math.max(2, (salesMap.get(item.sku) || 0) + 2);
           return {
             inventoryItemId: item.id,
             vendorSku: item.vendorSku || null,

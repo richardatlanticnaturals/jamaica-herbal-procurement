@@ -33,13 +33,19 @@ export async function POST(request: NextRequest) {
       },
       select: {
         sku: true,
+        totalQtySold: true,
       },
       distinct: ["sku"],
     });
 
     const soldSkus = salesRecords.map((r) => r.sku);
+    // Also return qty sold per SKU for sales-velocity-based ordering
+    const salesBySku: Record<string, number> = {};
+    for (const r of salesRecords) {
+      salesBySku[r.sku] = r.totalQtySold;
+    }
 
-    return NextResponse.json({ soldSkus });
+    return NextResponse.json({ soldSkus, salesBySku });
   } catch (error) {
     console.error("Sales check failed:", error);
     return NextResponse.json(

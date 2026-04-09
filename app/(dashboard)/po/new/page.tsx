@@ -139,13 +139,27 @@ export default function NewPurchaseOrderPage() {
     setSearchTimer(timer);
   };
 
-  // --- Add item to PO ---
-  const addItem = (item: InventoryItem) => {
+  // --- Add item to PO (fetches sales velocity for qty) ---
+  const addItem = async (item: InventoryItem) => {
     // Prevent duplicates
     if (lineItems.some((li) => li.inventoryItemId === item.id)) return;
 
-    // Fix: order qty capped at reorderQty, negative stock treated as 0
-    const defaultQty = Math.min(item.reorderQty, Math.max(1, (item.reorderPoint + item.reorderQty) - Math.max(0, item.currentStock)));
+    // Fetch sales velocity to calculate order qty: qtySoldLast4Months + 2, minimum 2
+    let defaultQty = 2;
+    try {
+      const res = await fetch("/api/inventory/sales-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skus: [item.sku] }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const qtySold = data.salesBySku?.[item.sku] || 0;
+        defaultQty = Math.max(2, qtySold + 2);
+      }
+    } catch {
+      // Fallback to minimum 2 if sales check fails
+    }
 
     setLineItems((prev) => [
       ...prev,
@@ -187,30 +201,33 @@ export default function NewPurchaseOrderPage() {
         return;
       }
 
-      // Optionally exclude slow movers (no sales in 4 months)
+      // Fetch sales data for all low stock items (used for both filtering and qty calculation)
+      let salesBySku: Record<string, number> = {};
       let filtered = lowStock;
       let excludedCount = 0;
-      if (excludeSlowMovers) {
-        try {
-          const skus = lowStock.map((i: any) => i.sku).filter(Boolean);
-          const salesCheckRes = await fetch("/api/inventory/sales-check", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ skus }),
-          });
-          if (salesCheckRes.ok) {
-            const salesData = await salesCheckRes.json();
+      try {
+        const skus = lowStock.map((i: any) => i.sku).filter(Boolean);
+        const salesCheckRes = await fetch("/api/inventory/sales-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skus }),
+        });
+        if (salesCheckRes.ok) {
+          const salesData = await salesCheckRes.json();
+          salesBySku = salesData.salesBySku || {};
+          // Optionally exclude slow movers (no sales in 4 months)
+          if (excludeSlowMovers) {
             const soldSkus = new Set(salesData.soldSkus || []);
             const before = filtered.length;
             filtered = filtered.filter((i: any) => soldSkus.has(i.sku));
             excludedCount = before - filtered.length;
           }
-        } catch {
-          // If sales check fails, include all items
         }
+      } catch {
+        // If sales check fails, include all items with default qty
       }
 
-      // Add items, skip duplicates
+      // Add items, skip duplicates. Qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
       const existingIds = new Set(lineItems.map((li) => li.inventoryItemId));
       const newItems: LineItem[] = filtered
         .filter((i: any) => !existingIds.has(i.id))
@@ -220,7 +237,7 @@ export default function NewPurchaseOrderPage() {
           name: i.name,
           vendorSku: i.vendorSku || null,
           description: i.name,
-          qtyOrdered: Math.min((i.reorderQty || 10), Math.max(1, ((i.reorderPoint || 5) + (i.reorderQty || 10)) - Math.max(0, i.currentStock))),
+          qtyOrdered: Math.max(2, (salesBySku[i.sku] || 0) + 2),
           unitCost: Number(i.costPrice) || 0,
           unitOfMeasure: i.unitOfMeasure || "Each",
         }));

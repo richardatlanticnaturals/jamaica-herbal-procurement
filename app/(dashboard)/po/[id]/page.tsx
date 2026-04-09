@@ -351,9 +351,24 @@ export default function PODetailPage() {
     setSearchTimer(timer);
   };
 
-  const addItemToEdit = (item: any) => {
+  const addItemToEdit = async (item: any) => {
     if (editLineItems.some((li) => li.inventoryItemId === item.id)) return;
-    const defaultQty = Math.min(item.reorderQty, Math.max(1, (item.reorderPoint + item.reorderQty) - Math.max(0, item.currentStock)));
+    // Fetch sales velocity for qty calculation: qtySoldLast4Months + 2, minimum 2
+    let defaultQty = 2;
+    try {
+      const res = await fetch("/api/inventory/sales-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skus: [item.sku] }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const qtySold = data.salesBySku?.[item.sku] || 0;
+        defaultQty = Math.max(2, qtySold + 2);
+      }
+    } catch {
+      // Fallback to minimum 2 if sales check fails
+    }
     setEditLineItems((prev) => [
       ...prev,
       {
@@ -481,8 +496,10 @@ export default function PODetailPage() {
   };
 
   // Handle PO update from chat -- refreshes line items table instantly
-  const handleChatPOUpdate = (updatedPO: any) => {
-    setPo(updatedPO);
+  // Bug fix: Re-fetch from GET endpoint instead of using chat response directly.
+  // The GET endpoint enriches line items with qtySold4mo data that the chat response lacks.
+  const handleChatPOUpdate = async (_updatedPO: any) => {
+    await loadPO();
     if (editing) {
       cancelEditing();
     }
