@@ -228,6 +228,7 @@ export async function fetchProducts(
     limit,
     sort: "title",
     order: "asc",
+    warehouseIds: [1, 2, 3], // Required to get onHand stock data
   });
 
   // Handle various response shapes the API might return

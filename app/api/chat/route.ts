@@ -889,8 +889,15 @@ async function handleSyncProducts(): Promise<string> {
         const costPrice = product.lastCost
           ? parseFloat(product.lastCost)
           : 0;
-        const onHand =
-          typeof product.onHand === "number" ? product.onHand : 0;
+        let onHand = 0;
+        if (Array.isArray(product.onHand)) {
+          onHand = product.onHand.reduce(
+            (sum: number, wh: any) => sum + parseFloat(wh.quantity || "0"), 0
+          );
+        } else if (typeof product.onHand === "number") {
+          onHand = product.onHand;
+        }
+        onHand = Math.round(onHand);
 
         if (!name || name === "Unknown") {
           skipped++;

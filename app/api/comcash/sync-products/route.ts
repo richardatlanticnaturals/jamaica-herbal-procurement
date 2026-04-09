@@ -49,8 +49,19 @@ export async function POST() {
           const costPrice = product.lastCost
             ? parseFloat(product.lastCost)
             : 0;
-          const onHand =
-            typeof product.onHand === "number" ? product.onHand : 0;
+          // onHand is an array of warehouse objects: [{warehouseId, quantity}]
+          // Sum all warehouse quantities to get total stock
+          let onHand = 0;
+          if (Array.isArray(product.onHand)) {
+            onHand = product.onHand.reduce(
+              (sum: number, wh: { quantity?: string }) =>
+                sum + parseFloat(wh.quantity || "0"),
+              0
+            );
+          } else if (typeof product.onHand === "number") {
+            onHand = product.onHand;
+          }
+          onHand = Math.round(onHand);
 
           // Skip products with no title
           if (!name || name === "Unknown") {
