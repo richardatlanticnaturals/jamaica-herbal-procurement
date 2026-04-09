@@ -18,67 +18,24 @@ const COMCASH_OPENAPI_KEY = process.env.COMCASH_OPENAPI_KEY || "";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // --- System prompt for the procurement assistant ---
-const SYSTEM_PROMPT = `You are the Jamaica Herbal procurement assistant. You help manage inventory, purchase orders, vendors, and sales data for two store locations in South Florida (Lauderdale Lakes and North Lauderdale).
-
-CRITICAL CONFIRMATION RULES:
-- NEVER make changes without showing the user a summary first and getting explicit confirmation.
-- For ANY write operation (editing inventory, creating POs, syncing, bulk updates), you MUST follow this exact flow:
-
-  1. PREVIEW: Do a dry run or query first. Show a clear summary table of what will change:
-     - How many items affected
-     - Sample of items (names, current values, new values)
-     - What systems will be updated (App Database + Comcash POS)
-
-  2. ASK: End your message with a clear question like:
-     "**Ready to apply these changes?** This will update X items in both the app and Comcash POS. Reply **yes** to confirm or **no** to cancel."
-
-  3. WAIT: Do NOT call any write tools until the user replies with confirmation (yes, confirm, do it, go ahead, etc.)
-
-  4. APPLY: Only after confirmation, call the write tool with dryRun: false. After the app database is updated, also call sync_inventory_to_comcash to push stock changes to the POS.
-
-  5. RECEIPT: Show a summary of what was changed:
-     - Items updated in app: X
-     - Items pushed to Comcash: Y
-     - Any errors
-
-- If the user says "no" or "cancel", acknowledge and do NOT apply changes.
-- For read-only queries (show me, list, what are, how many), no confirmation needed.
-
-OTHER RULES:
-- Be concise and use markdown tables for data when appropriate.
-- Format monetary values with $ and two decimal places.
-- If someone asks about best sellers, query sales data.
-- If someone asks about stock levels, query inventory.
-- For categorizing items, query uncategorized items first, suggest categories based on item names, show the mapping, and wait for confirmation.
-- Common categories for a herbal/natural products store: Herbs & Teas, Vitamins & Supplements, Essential Oils, Hair & Beauty, Body Care, Food & Beverages, Incense & Spiritual, Books & Accessories.`;
+const SYSTEM_PROMPT = `Jamaica Herbal procurement assistant. Two stores: Lauderdale Lakes, North Lauderdale.
+Be concise. Use markdown tables. Format money as $X.XX.
+WRITES: Always dry run first, show summary, ask "Ready to apply? yes/no", only apply after confirmation. After applying, sync to Comcash.
+READS: No confirmation needed.
+Categories: Herbs & Teas, Vitamins & Supplements, Essential Oils, Hair & Beauty, Body Care, Food & Beverages, Incense & Spiritual, Accessories.`;
 
 // --- Tool definitions for Claude ---
 const tools: Anthropic.Tool[] = [
   {
     name: "query_inventory",
-    description:
-      "Search and filter inventory items. Can find items by name/SKU, filter by stock status (all, low_stock, out_of_stock), or filter by vendor.",
+    description: "Search inventory by name/SKU, filter by stock status or vendor.",
     input_schema: {
       type: "object" as const,
       properties: {
-        search: {
-          type: "string",
-          description: "Search term to match against item name or SKU",
-        },
-        status: {
-          type: "string",
-          enum: ["all", "low_stock", "out_of_stock"],
-          description:
-            "Filter by stock status. low_stock = currentStock > 0 AND currentStock <= reorderPoint. out_of_stock = currentStock <= 0.",
-        },
-        vendorId: {
-          type: "string",
-          description: "Filter by vendor ID",
-        },
-        limit: {
-          type: "number",
-          description: "Max number of results to return (default 50)",
-        },
+        search: { type: "string" },
+        status: { type: "string", enum: ["all", "low_stock", "out_of_stock"] },
+        vendorId: { type: "string" },
+        limit: { type: "number" },
       },
       required: [],
     },
@@ -372,7 +329,7 @@ async function handleQueryInventory(
   const search = (input.search as string) || "";
   const status = (input.status as string) || "all";
   const vendorId = (input.vendorId as string) || "";
-  const limit = (input.limit as number) || 50;
+  const limit = (input.limit as number) || 20;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = { isActive: true };
@@ -437,7 +394,7 @@ async function handleQueryPurchaseOrders(
   const status = (input.status as string) || "";
   const vendorId = (input.vendorId as string) || "";
   const search = (input.search as string) || "";
-  const limit = (input.limit as number) || 50;
+  const limit = (input.limit as number) || 20;
   const dateFrom = (input.dateFrom as string) || "";
   const dateTo = (input.dateTo as string) || "";
 
@@ -495,7 +452,7 @@ async function handleQueryVendors(
   input: Record<string, unknown>
 ): Promise<string> {
   const search = (input.search as string) || "";
-  const limit = (input.limit as number) || 50;
+  const limit = (input.limit as number) || 20;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = { isActive: true };
@@ -532,7 +489,7 @@ async function handleQueryVendors(
 async function handleQuerySales(
   input: Record<string, unknown>
 ): Promise<string> {
-  const limit = (input.limit as number) || 50;
+  const limit = (input.limit as number) || 20;
   const timeFrom = (input.timeFrom as string) || "";
   const timeTo = (input.timeTo as string) || "";
 
@@ -1308,7 +1265,7 @@ export async function POST(request: NextRequest) {
 
       const response = await anthropic.messages.create({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 4096,
+        max_tokens: 2048,
         system: SYSTEM_PROMPT,
         tools,
         messages: currentMessages,
