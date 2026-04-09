@@ -672,7 +672,7 @@ export default function SettingsPage() {
                 <div className="space-y-1">
                   <Label className="text-sm font-medium">Auto-Tune Reorder Points</Label>
                   <p className="text-xs text-muted-foreground">
-                    Calculate optimal reorder points based on 4-month sales velocity and vendor lead times
+                    Calculate optimal reorder points based on 90-day sales velocity and vendor lead times (1.25x safety factor)
                   </p>
                 </div>
                 <Button
