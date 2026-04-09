@@ -375,14 +375,13 @@ async function handleQueryInventory(
     id: i.id,
     sku: i.sku,
     name: i.name,
-    currentStock: i.currentStock,
-    reorderPoint: i.reorderPoint,
-    reorderQty: i.reorderQty,
-    costPrice: Number(i.costPrice),
-    retailPrice: Number(i.retailPrice),
-    vendor: i.vendor?.name || "No vendor",
+    stock: i.currentStock,
+    reorder: i.reorderPoint,
+    cost: Number(i.costPrice),
+    price: Number(i.retailPrice),
+    vendor: i.vendor?.name || "—",
     vendorId: i.vendorId,
-    category: i.category,
+    cat: i.category || "",
   }));
 
   return JSON.stringify({ items: result, count: result.length });
@@ -433,16 +432,13 @@ async function handleQueryPurchaseOrders(
 
   const result = orders.map((o) => ({
     id: o.id,
-    poNumber: o.poNumber,
+    po: o.poNumber,
     vendor: o.vendor.name,
     vendorId: o.vendorId,
     status: o.status,
     total: Number(o.total),
-    lineItemCount: o._count.lineItems,
-    createdAt: o.createdAt.toISOString(),
-    sentAt: o.sentAt?.toISOString() || null,
-    expectedDate: o.expectedDate?.toISOString() || null,
-    notes: o.notes,
+    items: o._count.lineItems,
+    date: o.createdAt.toISOString().split("T")[0],
   }));
 
   return JSON.stringify({ orders: result, count: result.length });
@@ -473,14 +469,10 @@ async function handleQueryVendors(
   const result = vendors.map((v) => ({
     id: v.id,
     name: v.name,
-    contactName: v.contactName,
-    email: v.email,
-    phone: v.phone,
-    orderMethod: v.orderMethod,
-    leadTimeDays: v.leadTimeDays,
-    minimumOrder: v.minimumOrder ? Number(v.minimumOrder) : null,
-    poCount: v._count.purchaseOrders,
-    itemCount: v._count.items,
+    email: v.email || "",
+    phone: v.phone || "",
+    pos: v._count.purchaseOrders,
+    items: v._count.items,
   }));
 
   return JSON.stringify({ vendors: result, count: result.length });
@@ -1240,13 +1232,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert messages to Claude format
-    const claudeMessages: Anthropic.MessageParam[] = messages.map(
+    // Convert messages to Claude format — only keep last 6 messages to save tokens
+    const recentMessages = messages.slice(-6);
+    const claudeMessages: Anthropic.MessageParam[] = recentMessages.map(
       (m: { role: string; content: string }) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       })
     );
+    // Ensure first message is from user (Claude requires this)
+    if (claudeMessages.length > 0 && claudeMessages[0].role !== "user") {
+      claudeMessages.shift();
+    }
 
     // Token usage tracking across all loop iterations
     // Haiku 4.5 pricing: $1.00/M input, $5.00/M output
@@ -1265,7 +1262,7 @@ export async function POST(request: NextRequest) {
 
       const response = await anthropic.messages.create({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 2048,
+        max_tokens: 1024,
         system: SYSTEM_PROMPT,
         tools,
         messages: currentMessages,
