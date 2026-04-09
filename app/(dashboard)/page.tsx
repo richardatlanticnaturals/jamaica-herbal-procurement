@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -30,7 +30,22 @@ import {
   Zap,
   RefreshCw,
   Upload,
+  DollarSign,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+interface SpendingDay {
+  date: string;
+  total: number;
+}
 
 interface DashboardData {
   totalItems: number;
@@ -39,6 +54,7 @@ interface DashboardData {
   activePOs: number;
   totalVendors: number;
   pendingReceivings: number;
+  spendingByDay: SpendingDay[];
   recentPOs: {
     id: string;
     poNumber: string;
@@ -58,6 +74,13 @@ interface DashboardData {
     vendorName: string;
   }[];
 }
+
+// Day range options for the spending chart
+const SPENDING_RANGES = [
+  { label: "7 Days", value: 7 },
+  { label: "30 Days", value: 30 },
+  { label: "60 Days", value: 60 },
+] as const;
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-800",
@@ -108,12 +131,15 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [spendingDays, setSpendingDays] = useState(30);
+  const [spendingLoading, setSpendingLoading] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (days?: number) => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch("/api/dashboard");
+      const d = days ?? spendingDays;
+      const res = await fetch(`/api/dashboard?days=${d}`);
       if (!res.ok) throw new Error("Failed to load dashboard data");
       const json = await res.json();
       setData(json);
@@ -122,10 +148,29 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
+  }, [spendingDays]);
+
+  // Fetch only spending data when the range changes (avoids re-fetching KPIs)
+  const fetchSpending = useCallback(async (days: number) => {
+    try {
+      setSpendingLoading(true);
+      const res = await fetch(`/api/dashboard?days=${days}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      setData((prev) => prev ? { ...prev, spendingByDay: json.spendingByDay } : json);
+    } finally {
+      setSpendingLoading(false);
+    }
+  }, []);
+
+  const handleRangeChange = (days: number) => {
+    setSpendingDays(days);
+    fetchSpending(days);
   };
 
   useEffect(() => {
     fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (error) {
@@ -140,7 +185,7 @@ export default function DashboardPage() {
         <Card className="border-red-200 bg-red-50">
           <CardContent className="flex items-center justify-between py-6">
             <p className="text-sm text-red-700">{error}</p>
-            <Button variant="outline" size="sm" onClick={fetchData}>
+            <Button variant="outline" size="sm" onClick={() => fetchData()}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Retry
             </Button>
@@ -160,7 +205,7 @@ export default function DashboardPage() {
             Overview of your procurement activity
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+        <Button variant="outline" size="sm" onClick={() => fetchData()} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
@@ -274,6 +319,118 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* PO Spending Chart */}
+      <Card>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" style={{ color: "#009B3A" }} />
+              Purchase Order Spending
+            </CardTitle>
+            <CardDescription>
+              {loading || spendingLoading ? (
+                <Skeleton className="mt-1 h-4 w-32" />
+              ) : (
+                <>
+                  Total:{" "}
+                  <span className="font-semibold text-foreground">
+                    {formatCurrency(
+                      (data?.spendingByDay ?? []).reduce((sum, d) => sum + d.total, 0)
+                    )}
+                  </span>{" "}
+                  over {spendingDays} days
+                </>
+              )}
+            </CardDescription>
+          </div>
+          {/* Day range selector — pill-style buttons */}
+          <div className="flex gap-1 rounded-lg border p-1 bg-muted/50">
+            {SPENDING_RANGES.map((range) => (
+              <button
+                key={range.value}
+                onClick={() => handleRangeChange(range.value)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  spendingDays === range.value
+                    ? "bg-white text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading && !data ? (
+            <Skeleton className="h-[280px] w-full rounded-md" />
+          ) : !data?.spendingByDay?.length ? (
+            <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
+              No PO spending data for this period.
+            </div>
+          ) : (
+            <div className="relative h-[280px] w-full">
+              {spendingLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 rounded-md">
+                  <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={data.spendingByDay}
+                  margin={{ top: 4, right: 4, left: 4, bottom: 4 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v: string) => {
+                      const d = new Date(v + "T00:00:00");
+                      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    }}
+                    interval="preserveStartEnd"
+                    minTickGap={40}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v: number) =>
+                      v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`
+                    }
+                    width={52}
+                  />
+                  <Tooltip
+                    formatter={(value) => [formatCurrency(Number(value)), "Spend"]}
+                    labelFormatter={(label) => {
+                      const d = new Date(String(label) + "T00:00:00");
+                      return d.toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      });
+                    }}
+                    contentStyle={{
+                      borderRadius: "8px",
+                      border: "1px solid #e5e7eb",
+                      fontSize: "13px",
+                    }}
+                  />
+                  <Bar
+                    dataKey="total"
+                    fill="#009B3A"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={48}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recent POs & Alerts */}
       <div className="grid gap-4 lg:grid-cols-2">

@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import {
   Sidebar,
@@ -29,6 +30,7 @@ import {
   FileText,
   PackageCheck,
   Bell,
+  Sparkles,
   Settings,
   LogOut,
   ChevronUp,
@@ -41,6 +43,7 @@ const navItems = [
   { title: "Purchase Orders", href: "/po", icon: FileText },
   { title: "Receiving", href: "/receiving", icon: PackageCheck },
   { title: "Alerts", href: "/alerts", icon: Bell },
+  { title: "AI Chat", href: "/chat", icon: Sparkles },
   { title: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -52,27 +55,14 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-green-700"
-            >
-              <path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 17 3.5s2 1.9 2 5.1a7 7 0 0 1-5 6.7" />
-              <path d="M11.2 12a7 7 0 0 0-3.8 5.4" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-semibold">Jamaica Herbal</p>
-            <p className="text-xs text-muted-foreground">Procurement</p>
-          </div>
+          <Image
+            src="/jh-logo.png"
+            alt="Jamaica Herbal"
+            width={140}
+            height={40}
+            className="h-9 w-auto"
+            priority
+          />
         </div>
       </SidebarHeader>
 

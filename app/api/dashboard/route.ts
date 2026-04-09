@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const authError = await requireAuth();
   if (authError) return authError;
+
+  // Parse optional "days" query param for spending chart (default 30)
+  const { searchParams } = new URL(request.url);
+  const days = Math.min(Math.max(Number(searchParams.get("days")) || 30, 1), 365);
 
   try {
     const [
@@ -16,6 +20,7 @@ export async function GET() {
       recentPOs,
       recentAlerts,
       lowStockRaw,
+      spendingRaw,
     ] = await Promise.all([
       // Total active inventory items
       prisma.inventoryItem.count({ where: { isActive: true } }),
@@ -91,9 +96,28 @@ export async function GET() {
           AND "currentStock" > 0
           AND "currentStock" <= "reorderPoint"
       `,
+
+      // PO spending grouped by day for the chart
+      // Only include actionable statuses (not DRAFT or CANCELLED)
+      prisma.$queryRaw<{ date: string; total: string }[]>`
+        SELECT
+          TO_CHAR("createdAt"::date, 'YYYY-MM-DD') as date,
+          SUM("total")::text as total
+        FROM "PurchaseOrder"
+        WHERE "status" IN ('SENT', 'CONFIRMED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CLOSED')
+          AND "createdAt" >= NOW() - (${days} || ' days')::interval
+        GROUP BY "createdAt"::date
+        ORDER BY "createdAt"::date ASC
+      `,
     ]);
 
     const lowStockItems = Number(lowStockRaw[0]?.count ?? 0);
+
+    // Convert spending raw results to clean numbers
+    const spendingByDay = spendingRaw.map((row) => ({
+      date: row.date,
+      total: parseFloat(row.total) || 0,
+    }));
 
     return NextResponse.json({
       totalItems,
@@ -120,6 +144,7 @@ export async function GET() {
         poNumber: log.purchaseOrder.poNumber,
         vendorName: log.purchaseOrder.vendor?.name ?? "Unknown",
       })),
+      spendingByDay,
     });
   } catch (error) {
     console.error("Failed to fetch dashboard data:", error);
