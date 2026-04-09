@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Send, Loader2, Sparkles, RotateCcw } from "lucide-react";
+import { Send, Loader2, Sparkles, RotateCcw, ChevronDown, ChevronUp, Database, RefreshCw, Package, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // --- Types ---
@@ -44,6 +44,56 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sync bar state
+  const [syncBarOpen, setSyncBarOpen] = useState(false);
+  const [syncingStock, setSyncingStock] = useState(false);
+  const [syncingSales, setSyncingSales] = useState(false);
+  const [syncingProducts, setSyncingProducts] = useState(false);
+  const [syncingVendors, setSyncingVendors] = useState(false);
+  const [lastStockSync, setLastStockSync] = useState<string | null>(null);
+
+  // Fetch last stock sync timestamp on mount
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((s) => setLastStockSync(s.lastStockSync || null))
+      .catch(() => {});
+  }, []);
+
+  const handleSync = async (
+    type: "stock" | "sales" | "products" | "vendors"
+  ) => {
+    const setLoading = {
+      stock: setSyncingStock,
+      sales: setSyncingSales,
+      products: setSyncingProducts,
+      vendors: setSyncingVendors,
+    }[type];
+    const endpoint = {
+      stock: "/api/comcash/refresh-stock",
+      sales: "/api/comcash/sync-sales",
+      products: "/api/comcash/sync-products",
+      vendors: "/api/comcash/sync-vendors",
+    }[type];
+
+    setLoading(true);
+    try {
+      await fetch(endpoint, { method: "POST" });
+      if (type === "stock") {
+        // Refresh the lastStockSync timestamp
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const s = await res.json();
+          setLastStockSync(s.lastStockSync || null);
+        }
+      }
+    } catch (err) {
+      console.error(`Sync ${type} failed:`, err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
@@ -182,6 +232,81 @@ export default function ChatPage() {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Sync Data Bar */}
+      <div className="border-b">
+        <button
+          onClick={() => setSyncBarOpen(!syncBarOpen)}
+          className="flex w-full items-center justify-between px-4 py-2 text-xs text-muted-foreground hover:bg-accent/50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Database className="h-3 w-3" />
+            <span>Sync Data</span>
+            {lastStockSync && (
+              <span className="text-muted-foreground/60">
+                &middot; Last stock sync: {(() => {
+                  const seconds = Math.floor((Date.now() - new Date(lastStockSync).getTime()) / 1000);
+                  if (seconds < 60) return "just now";
+                  const minutes = Math.floor(seconds / 60);
+                  if (minutes < 60) return `${minutes}m ago`;
+                  const hours = Math.floor(minutes / 60);
+                  if (hours < 24) return `${hours}h ago`;
+                  return `${Math.floor(hours / 24)}d ago`;
+                })()}
+              </span>
+            )}
+          </div>
+          {syncBarOpen ? (
+            <ChevronUp className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          )}
+        </button>
+        {syncBarOpen && (
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSync("stock")}
+              disabled={syncingStock}
+              className="h-7 text-xs"
+            >
+              {syncingStock ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Database className="mr-1 h-3 w-3" />}
+              Refresh Stock
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSync("sales")}
+              disabled={syncingSales}
+              className="h-7 text-xs"
+            >
+              {syncingSales ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+              Sync Sales
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSync("products")}
+              disabled={syncingProducts}
+              className="h-7 text-xs"
+            >
+              {syncingProducts ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Package className="mr-1 h-3 w-3" />}
+              Sync Products
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSync("vendors")}
+              disabled={syncingVendors}
+              className="h-7 text-xs"
+            >
+              {syncingVendors ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Users className="mr-1 h-3 w-3" />}
+              Sync Vendors
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Messages area */}

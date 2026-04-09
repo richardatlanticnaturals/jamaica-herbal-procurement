@@ -31,6 +31,7 @@ import {
   RefreshCw,
   Upload,
   DollarSign,
+  Database,
 } from "lucide-react";
 import {
   BarChart,
@@ -133,6 +134,8 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [spendingDays, setSpendingDays] = useState(30);
   const [spendingLoading, setSpendingLoading] = useState(false);
+  const [stockRefreshing, setStockRefreshing] = useState(false);
+  const [lastStockSync, setLastStockSync] = useState<string | null>(null);
 
   const fetchData = useCallback(async (days?: number) => {
     try {
@@ -168,8 +171,39 @@ export default function DashboardPage() {
     fetchSpending(days);
   };
 
+  // Fetch last stock sync timestamp from AppSettings
+  const fetchLastStockSync = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings");
+      if (res.ok) {
+        const settings = await res.json();
+        setLastStockSync(settings.lastStockSync || null);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Fast stock-only refresh from Comcash POS
+  const handleRefreshStock = useCallback(async () => {
+    setStockRefreshing(true);
+    try {
+      const res = await fetch("/api/comcash/refresh-stock", { method: "POST" });
+      if (res.ok) {
+        // Refresh dashboard data and last sync timestamp
+        fetchData();
+        fetchLastStockSync();
+      }
+    } catch (err) {
+      console.error("Stock refresh failed:", err);
+    } finally {
+      setStockRefreshing(false);
+    }
+  }, [fetchData, fetchLastStockSync]);
+
   useEffect(() => {
     fetchData();
+    fetchLastStockSync();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -205,10 +239,21 @@ export default function DashboardPage() {
             Overview of your procurement activity
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => fetchData()} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {lastStockSync && (
+            <span className="text-xs text-muted-foreground">
+              Stock synced: {timeAgo(lastStockSync)}
+            </span>
+          )}
+          <Button variant="outline" size="sm" onClick={handleRefreshStock} disabled={stockRefreshing}>
+            <Database className={`mr-2 h-4 w-4 ${stockRefreshing ? "animate-spin" : ""}`} />
+            {stockRefreshing ? "Syncing..." : "Refresh Stock"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => fetchData()} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}

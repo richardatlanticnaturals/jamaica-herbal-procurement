@@ -26,6 +26,7 @@ import {
   Package,
   Upload,
   ArrowDownToLine,
+  BarChart3,
 } from "lucide-react";
 
 interface AppSettings {
@@ -67,6 +68,10 @@ export default function SettingsPage() {
   const [productSyncResult, setProductSyncResult] =
     useState<SyncResult | null>(null);
   const [pushResult, setPushResult] = useState<SyncResult | null>(null);
+
+  // Sales sync states
+  const [syncingSales, setSyncingSales] = useState(false);
+  const [salesSyncResult, setSalesSyncResult] = useState<SyncResult | null>(null);
 
   // Editable fields
   const [poPrefix, setPoPrefix] = useState("PO");
@@ -210,6 +215,37 @@ export default function SettingsPage() {
       });
     } finally {
       setPushingInventory(false);
+    }
+  };
+
+  const handleSyncSales = async () => {
+    setSyncingSales(true);
+    setSalesSyncResult(null);
+    try {
+      const res = await fetch("/api/comcash/sync-sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ months: 4 }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSalesSyncResult({
+          success: true,
+          message: data.message || `Synced ${data.upserted} products from ${data.totalSalesProcessed} sales`,
+        });
+      } else {
+        setSalesSyncResult({
+          success: false,
+          message: data.error || "Sales sync failed",
+        });
+      }
+    } catch (err) {
+      setSalesSyncResult({
+        success: false,
+        message: err instanceof Error ? err.message : "Sales sync failed",
+      });
+    } finally {
+      setSyncingSales(false);
     }
   };
 
@@ -394,6 +430,37 @@ export default function SettingsPage() {
               </Button>
             </div>
             {renderSyncAlert(pushResult)}
+
+            {/* Sync Sales Data */}
+            <div className="flex items-center gap-4 pt-3 border-t">
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Sales Data Cache
+                </Label>
+                <p className="text-sm">
+                  Aggregates 4 months of sales by product for fast slow-mover and top-seller queries
+                </p>
+              </div>
+              <Button
+                onClick={handleSyncSales}
+                disabled={syncingSales || !settings?.comcashApiKeySet}
+                size="sm"
+                variant="outline"
+              >
+                {syncingSales ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Syncing Sales...
+                  </>
+                ) : (
+                  <>
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Sync Sales Data
+                  </>
+                )}
+              </Button>
+            </div>
+            {renderSyncAlert(salesSyncResult)}
           </CardContent>
         </Card>
 

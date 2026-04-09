@@ -7,6 +7,7 @@ import {
   fetchVendors,
   fetchAllProducts,
 } from "@/lib/comcash";
+import { refreshStock } from "@/lib/refresh-stock";
 
 // --- Comcash Employee API config ---
 const COMCASH_OPENAPI_URL =
@@ -22,7 +23,8 @@ const SYSTEM_PROMPT = `Jamaica Herbal procurement assistant. Two stores: Lauderd
 Be concise. Use markdown tables. Format money as $X.XX.
 WRITES: Always dry run first, show summary, ask "Ready to apply? yes/no", only apply after confirmation. After applying, sync to Comcash.
 READS: No confirmation needed.
-SLOW SELLERS: To find items that haven't sold recently, use query_slow_movers tool which checks the Comcash qtyUpdated timestamp (last stock movement date). This is more reliable than sales data.
+SALES DATA: Use query_top_sellers for best sellers and query_slow_movers for items that haven't sold. Both use the local ProductSales cache (synced from Comcash). For real-time recent sales, use query_sales which calls the API directly.
+STOCK LEVELS: When answering stock level questions, always call refresh_stock first to ensure data is current. Tell the user "Refreshing stock from POS..." before showing results.
 Categories: Herbs & Teas, Vitamins & Supplements, Essential Oils, Hair & Beauty, Body Care, Food & Beverages, Incense & Spiritual, Accessories.`;
 
 // --- Tool definitions for Claude ---
@@ -280,15 +282,40 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: "query_slow_movers",
-    description: "Find items that haven't had stock movement (sold or restocked) in X months. Uses Comcash qtyUpdated timestamp. Can filter by vendor.",
+    description: "Find inventory items that haven't sold recently, using the ProductSales cache. Returns items NOT in the sales cache (never sold) or with lastSoldAt older than X months. Can filter by vendor.",
     input_schema: {
       type: "object" as const,
       properties: {
-        months: { type: "number", description: "Items with no movement in this many months (default 3)" },
+        months: { type: "number", description: "Items with no sales in this many months (default 4)" },
         vendorId: { type: "string", description: "Filter by vendor ID" },
         vendorName: { type: "string", description: "Filter by vendor name (searches)" },
         limit: { type: "number", description: "Max results (default 20)" },
       },
+      required: [],
+    },
+  },
+  {
+    name: "query_top_sellers",
+    description: "Get top-selling products from the ProductSales cache. Sort by quantity sold or revenue. Can filter by vendor, category, or date range.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        sortBy: { type: "string", enum: ["qty", "revenue"], description: "Sort by quantity sold or revenue (default qty)" },
+        vendorId: { type: "string", description: "Filter by vendor ID" },
+        vendorName: { type: "string", description: "Filter by vendor name (searches)" },
+        category: { type: "string", description: "Filter by inventory category" },
+        limit: { type: "number", description: "Max results (default 20)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "refresh_stock",
+    description:
+      "Fast refresh of stock levels from the Comcash POS. Updates ONLY currentStock on inventory items (not names, prices, or vendors). Call this before answering any stock level questions to ensure data is current.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
       required: [],
     },
   },
@@ -347,6 +374,8 @@ async function executeToolCall(
       case "bulk_update_inventory": result = await handleBulkUpdateInventory(input); break;
       case "sync_inventory_to_comcash": result = await handleSyncInventoryToComcash(input); break;
       case "query_slow_movers": result = await handleQuerySlowMovers(input); break;
+      case "query_top_sellers": result = await handleQueryTopSellers(input); break;
+      case "refresh_stock": result = await handleRefreshStock(); break;
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -522,18 +551,56 @@ async function handleQuerySales(
   const timeFrom = (input.timeFrom as string) || "";
   const timeTo = (input.timeTo as string) || "";
 
+  // --- Check ProductSales cache for aggregate data first ---
   try {
-    // Authenticate with Comcash Employee API
+    const cachedCount = await prisma.productSales.count();
+    if (cachedCount > 0 && !timeFrom && !timeTo) {
+      // Return aggregate summary from cache instead of hitting API
+      const topByQty = await prisma.productSales.findMany({
+        orderBy: { totalQtySold: "desc" },
+        take: Math.min(limit, 20),
+        include: {
+          inventoryItem: {
+            select: { vendor: { select: { name: true } }, category: true },
+          },
+        },
+      });
+
+      const summary = topByQty.map((ps) => ({
+        name: ps.productName,
+        sku: ps.sku,
+        qtySold: ps.totalQtySold,
+        revenue: Number(ps.totalRevenue),
+        lastSold: ps.lastSoldAt
+          ? ps.lastSoldAt.toISOString().split("T")[0]
+          : "never",
+        transactions: ps.salesCount,
+        vendor: ps.inventoryItem?.vendor?.name || "--",
+        category: ps.inventoryItem?.category || "--",
+      }));
+
+      return JSON.stringify({
+        source: "cache",
+        sales: summary,
+        count: summary.length,
+        totalCachedProducts: cachedCount,
+        note: "Showing aggregated data from ProductSales cache. Use sync-sales to refresh. Pass timeFrom/timeTo to fetch real-time from Comcash API.",
+      });
+    }
+  } catch {
+    // Cache query failed — fall through to live API
+  }
+
+  // --- Fall through to live Comcash API for real-time or filtered queries ---
+  try {
     const token = await authenticateEmployee();
 
-    // Build request body for sale/list
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body: any = {
       offset: 0,
       limit,
     };
 
-    // The sale/list endpoint may accept date filters
     if (timeFrom) body.timeFrom = timeFrom;
     if (timeTo) body.timeTo = timeTo;
 
@@ -557,13 +624,14 @@ async function handleQuerySales(
     const rawData = await res.json();
     const salesArr = Array.isArray(rawData) ? rawData : rawData.data || [];
 
-    // Slim down sales data — only send what Claude needs, not full objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sales = salesArr.slice(0, Math.min(limit, 20)).map((s: any) => ({
       id: s.id,
       date: s.timeCreated ? new Date(s.timeCreated * 1000).toISOString().split("T")[0] : "",
       total: s.payment?.totalPayedAmount || "0",
       customer: s.customer ? `${s.customer.firstName || ""} ${s.customer.lastName || ""}`.trim() : "Walk-in",
       employee: s.employeeId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       items: (s.products || []).map((p: any) => ({
         name: p.title,
         qty: p.quantity,
@@ -571,7 +639,7 @@ async function handleQuerySales(
       })),
     }));
 
-    return JSON.stringify({ sales, count: salesArr.length });
+    return JSON.stringify({ source: "live_api", sales, count: salesArr.length });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     return JSON.stringify({
@@ -1008,104 +1076,198 @@ async function handleSyncProducts(): Promise<string> {
 async function handleQuerySlowMovers(
   input: Record<string, unknown>
 ): Promise<string> {
-  const months = (input.months as number) || 3;
+  const months = (input.months as number) || 4;
   const vendorName = (input.vendorName as string) || "";
   const vendorId = (input.vendorId as string) || "";
   const limit = (input.limit as number) || 20;
 
   try {
-    // Get JWT and fetch products with qtyUpdated from Comcash
-    const token = await authenticateEmployee();
+    const cutoffDate = new Date();
+    cutoffDate.setMonth(cutoffDate.getMonth() - months);
 
-    // Find vendor ID if name given
+    // Resolve vendor filter
     let filterVendorId = vendorId;
     if (vendorName && !filterVendorId) {
       const vendor = await prisma.vendor.findFirst({
         where: { name: { contains: vendorName, mode: "insensitive" } },
-        select: { id: true, comcashVendorId: true },
+        select: { id: true },
       });
-      if (vendor?.comcashVendorId) {
-        filterVendorId = vendor.id;
+      if (vendor) filterVendorId = vendor.id;
+    }
+
+    // Build inventory filter
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const invWhere: any = { isActive: true };
+    if (filterVendorId) invWhere.vendorId = filterVendorId;
+
+    // Get all active inventory items
+    const allItems = await prisma.inventoryItem.findMany({
+      where: invWhere,
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        currentStock: true,
+        costPrice: true,
+        retailPrice: true,
+        category: true,
+        vendor: { select: { name: true } },
+      },
+    });
+
+    // Get ProductSales for items that HAVE sold
+    const salesData = await prisma.productSales.findMany({
+      where: {
+        sku: { in: allItems.map((i) => i.sku) },
+      },
+      select: {
+        sku: true,
+        lastSoldAt: true,
+        totalQtySold: true,
+        totalRevenue: true,
+      },
+    });
+
+    const salesBySku = new Map(salesData.map((s) => [s.sku, s]));
+
+    // Find slow movers: never sold OR last sold before cutoff
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const slowMovers: any[] = [];
+
+    for (const item of allItems) {
+      const sale = salesBySku.get(item.sku);
+      const lastSold = sale?.lastSoldAt || null;
+      const isSlowMover = !lastSold || lastSold < cutoffDate;
+
+      if (isSlowMover) {
+        slowMovers.push({
+          name: item.name,
+          sku: item.sku,
+          stock: item.currentStock,
+          cost: Number(item.costPrice),
+          price: Number(item.retailPrice),
+          lastSold: lastSold ? lastSold.toISOString().split("T")[0] : "never",
+          qtySold: sale?.totalQtySold || 0,
+          revenue: sale ? Number(sale.totalRevenue) : 0,
+          vendor: item.vendor?.name || "--",
+          category: item.category || "--",
+        });
       }
     }
 
-    // Calculate cutoff timestamp (months ago)
-    const cutoffDate = new Date();
-    cutoffDate.setMonth(cutoffDate.getMonth() - months);
-    const cutoffTimestamp = Math.floor(cutoffDate.getTime() / 1000);
+    // Sort: never-sold first, then by oldest lastSold
+    slowMovers.sort((a, b) => {
+      if (a.lastSold === "never" && b.lastSold !== "never") return -1;
+      if (a.lastSold !== "never" && b.lastSold === "never") return 1;
+      return a.lastSold.localeCompare(b.lastSold);
+    });
 
-    // Fetch products from Comcash with qtyUpdated
-    const allSlowMovers: any[] = [];
-    let offset = 0;
-    const batchLimit = 100;
-
-    while (allSlowMovers.length < limit * 3) { // fetch extra to filter
-      const res = await fetch(`${COMCASH_OPENAPI_URL}/employee/product/list`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ offset, limit: batchLimit, sort: "title", order: "asc", warehouseIds: [1, 2, 3] }),
-      });
-
-      const products = await res.json();
-      if (!Array.isArray(products) || products.length === 0) break;
-
-      for (const p of products) {
-        const qtyUpdated = p.qtyUpdated || 0;
-        // Filter: last movement before cutoff
-        if (qtyUpdated > 0 && qtyUpdated < cutoffTimestamp) {
-          // Filter by vendor if specified
-          if (filterVendorId) {
-            const sku = (p.skuCodes && p.skuCodes[0]) || "";
-            const item = await prisma.inventoryItem.findFirst({
-              where: { OR: [{ sku }, { comcashItemId: String(p.id) }], vendorId: filterVendorId },
-              select: { id: true },
-            });
-            if (!item) continue;
-          } else if (vendorName) {
-            const vName = p.primaryVendorName || "";
-            if (!vName.toLowerCase().includes(vendorName.toLowerCase())) continue;
-          }
-
-          const onHand = Array.isArray(p.onHand)
-            ? p.onHand.reduce((s: number, w: any) => s + parseFloat(w.quantity || "0"), 0)
-            : 0;
-
-          allSlowMovers.push({
-            name: p.title,
-            sku: (p.skuCodes && p.skuCodes[0]) || "",
-            stock: Math.round(onHand),
-            cost: p.lastCost ? parseFloat(p.lastCost) : 0,
-            price: p.price ? parseFloat(p.price) : 0,
-            lastMovement: new Date(qtyUpdated * 1000).toISOString().split("T")[0],
-            vendor: p.primaryVendorName || "—",
-          });
-        }
-      }
-
-      if (products.length < batchLimit) break;
-      offset += batchLimit;
-      if (offset > 4000) break; // safety cap
-    }
-
-    // Sort by oldest movement first
-    allSlowMovers.sort((a, b) => a.lastMovement.localeCompare(b.lastMovement));
-    const result = allSlowMovers.slice(0, limit);
+    const result = slowMovers.slice(0, limit);
 
     return JSON.stringify({
+      source: "product_sales_cache",
       items: result,
       count: result.length,
-      totalSlowMovers: allSlowMovers.length,
+      totalSlowMovers: slowMovers.length,
       cutoffDate: cutoffDate.toISOString().split("T")[0],
-      message: `Found ${allSlowMovers.length} items with no stock movement since ${cutoffDate.toISOString().split("T")[0]}${vendorName ? ` from ${vendorName}` : ""}`,
+      message: `Found ${slowMovers.length} items with no sales since ${cutoffDate.toISOString().split("T")[0]}${vendorName ? ` from ${vendorName}` : ""}`,
     });
   } catch (err) {
     return JSON.stringify({
       error: `Failed to query slow movers: ${err instanceof Error ? err.message : "Unknown error"}`,
     });
   }
+}
+
+// --- query_top_sellers: aggregated top sellers from ProductSales cache ---
+async function handleQueryTopSellers(
+  input: Record<string, unknown>
+): Promise<string> {
+  const sortBy = (input.sortBy as string) || "qty";
+  const vendorName = (input.vendorName as string) || "";
+  const vendorId = (input.vendorId as string) || "";
+  const category = (input.category as string) || "";
+  const limit = (input.limit as number) || 20;
+
+  try {
+    // Build filter for ProductSales joined with InventoryItem
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {};
+
+    // Filter by vendor (through inventory item relation)
+    let filterVendorId = vendorId;
+    if (vendorName && !filterVendorId) {
+      const vendor = await prisma.vendor.findFirst({
+        where: { name: { contains: vendorName, mode: "insensitive" } },
+        select: { id: true },
+      });
+      if (vendor) filterVendorId = vendor.id;
+    }
+
+    if (filterVendorId || category) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const invFilter: any = {};
+      if (filterVendorId) invFilter.vendorId = filterVendorId;
+      if (category) invFilter.category = { contains: category, mode: "insensitive" };
+      where.inventoryItem = invFilter;
+    }
+
+    const topSellers = await prisma.productSales.findMany({
+      where,
+      orderBy: sortBy === "revenue" ? { totalRevenue: "desc" } : { totalQtySold: "desc" },
+      take: limit,
+      include: {
+        inventoryItem: {
+          select: {
+            currentStock: true,
+            reorderPoint: true,
+            costPrice: true,
+            retailPrice: true,
+            category: true,
+            vendor: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    const result = topSellers.map((ps) => ({
+      name: ps.productName,
+      sku: ps.sku,
+      qtySold: ps.totalQtySold,
+      revenue: Number(ps.totalRevenue),
+      lastSold: ps.lastSoldAt ? ps.lastSoldAt.toISOString().split("T")[0] : "never",
+      transactions: ps.salesCount,
+      currentStock: ps.inventoryItem?.currentStock ?? "--",
+      reorderPt: ps.inventoryItem?.reorderPoint ?? "--",
+      vendor: ps.inventoryItem?.vendor?.name || "--",
+      category: ps.inventoryItem?.category || "--",
+    }));
+
+    return JSON.stringify({
+      source: "product_sales_cache",
+      items: result,
+      count: result.length,
+      sortedBy: sortBy === "revenue" ? "totalRevenue" : "totalQtySold",
+    });
+  } catch (err) {
+    return JSON.stringify({
+      error: `Failed to query top sellers: ${err instanceof Error ? err.message : "Unknown error"}`,
+    });
+  }
+}
+
+async function handleRefreshStock(): Promise<string> {
+  const result = await refreshStock();
+  return JSON.stringify({
+    success: result.success,
+    itemsUpdated: result.itemsUpdated,
+    itemsSkipped: result.itemsSkipped,
+    totalFetched: result.totalFetched,
+    durationMs: result.durationMs,
+    message: result.success
+      ? `Stock refreshed from POS: ${result.itemsUpdated} items updated, ${result.itemsSkipped} unchanged (${result.durationMs}ms)`
+      : `Stock refresh failed: ${result.error}`,
+  });
 }
 
 async function handleSyncInventoryToComcash(

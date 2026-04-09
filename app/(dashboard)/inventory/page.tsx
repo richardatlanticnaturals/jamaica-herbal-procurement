@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, Search, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Upload, Search, ChevronLeft, ChevronRight, Pencil, Database } from "lucide-react";
 
 export default function InventoryPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -53,6 +53,10 @@ export default function InventoryPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [vendors, setVendors] = useState<any[]>([]);
+
+  // Stock refresh state
+  const [stockRefreshing, setStockRefreshing] = useState(false);
+  const [lastStockSync, setLastStockSync] = useState<string | null>(null);
 
   // Edit form fields
   const [editReorderPoint, setEditReorderPoint] = useState(0);
@@ -98,15 +102,45 @@ export default function InventoryPage() {
     loadItems();
   }, [loadItems]);
 
+  // Fetch last stock sync timestamp
+  const fetchLastStockSync = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings");
+      if (res.ok) {
+        const settings = await res.json();
+        setLastStockSync(settings.lastStockSync || null);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Fast stock-only refresh from Comcash POS
+  const handleRefreshStock = useCallback(async () => {
+    setStockRefreshing(true);
+    try {
+      const res = await fetch("/api/comcash/refresh-stock", { method: "POST" });
+      if (res.ok) {
+        loadItems();
+        fetchLastStockSync();
+      }
+    } catch (err) {
+      console.error("Stock refresh failed:", err);
+    } finally {
+      setStockRefreshing(false);
+    }
+  }, [loadItems, fetchLastStockSync]);
+
   useEffect(() => {
     loadVendors();
+    fetchLastStockSync();
     // Load distinct categories
     fetch("/api/categories").then(r => r.json()).then(data => {
       if (data.categories) {
         setCategories(data.categories.map((c: any) => c.name).filter(Boolean));
       }
     }).catch(() => {});
-  }, [loadVendors]);
+  }, [loadVendors, fetchLastStockSync]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,7 +240,30 @@ export default function InventoryPage() {
             {total > 0 ? `${total} products in inventory` : "Manage your product inventory"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {lastStockSync && (
+            <span className="text-xs text-muted-foreground">
+              Stock synced: {(() => {
+                const seconds = Math.floor((Date.now() - new Date(lastStockSync).getTime()) / 1000);
+                if (seconds < 60) return "just now";
+                const minutes = Math.floor(seconds / 60);
+                if (minutes < 60) return `${minutes}m ago`;
+                const hours = Math.floor(minutes / 60);
+                if (hours < 24) return `${hours}h ago`;
+                return `${Math.floor(hours / 24)}d ago`;
+              })()}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshStock}
+            disabled={stockRefreshing}
+            className="h-7"
+          >
+            <Database className={`h-3.5 w-3.5 mr-1 ${stockRefreshing ? "animate-spin" : ""}`} />
+            {stockRefreshing ? "Syncing..." : "Refresh Stock"}
+          </Button>
           <label className="cursor-pointer inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-primary text-primary-foreground text-sm font-medium h-7 gap-1 px-2.5 hover:bg-primary/80 transition-all">
             <Upload className="h-3.5 w-3.5 mr-1" />
             {uploading ? "Importing..." : "Import CSV"}

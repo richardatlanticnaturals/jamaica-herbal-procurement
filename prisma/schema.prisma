@@ -113,6 +113,7 @@ model InventoryItem {
   poLineItems    POLineItem[]
   receivingItems ReceivingLineItem[]
   alternatives   AlternativeProduct[] @relation("PrimaryItem")
+  productSales   ProductSales[]
 }
 
 model PurchaseOrder {
@@ -233,8 +234,32 @@ model AppSettings {
   lastInventorySync   DateTime?
   lastVendorSync      DateTime?
   lastProductSync     DateTime?
+  lastStockSync       DateTime?
   defaultReorderPoint Int      @default(5)
   defaultReorderQty   Int      @default(12)
+}
+
+// ============================================
+// SALES CACHE (aggregated from Comcash sale/list API)
+// ============================================
+
+model ProductSales {
+  id              String   @id @default(cuid())
+  sku             String
+  comcashProductId Int?
+  productName     String
+  totalQtySold    Int      @default(0)
+  totalRevenue    Decimal  @default(0) @db.Decimal(10, 2)
+  lastSoldAt      DateTime?
+  salesCount      Int      @default(0)
+  periodStart     DateTime
+  periodEnd       DateTime
+  inventoryItemId String?
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([sku, periodStart])
 }
 
 // ============================================
