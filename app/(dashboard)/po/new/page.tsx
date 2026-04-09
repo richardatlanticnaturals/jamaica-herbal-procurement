@@ -87,6 +87,9 @@ export default function NewPurchaseOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Auto-fill low stock
+  const [autoFilling, setAutoFilling] = useState(false);
+
   // --- Load vendors on mount ---
   useEffect(() => {
     const loadVendors = async () => {
@@ -157,6 +160,50 @@ export default function NewPurchaseOrderPage() {
       },
     ]);
   };
+
+  // --- Auto-fill low stock items for selected vendor ---
+  const autoFillLowStock = useCallback(async () => {
+    if (!selectedVendorId) return;
+    setAutoFilling(true);
+    try {
+      // Fetch all items for this vendor
+      const res = await fetch(`/api/inventory?vendorId=${selectedVendorId}&limit=500&filter=all`);
+      const data = await res.json();
+      const items = (data.items || []) as InventoryItem[];
+
+      // Filter to low stock (currentStock <= reorderPoint)
+      const lowStock = items.filter(
+        (i: any) => i.currentStock <= (i.reorderPoint || 5)
+      );
+
+      if (lowStock.length === 0) {
+        setError("No low stock items found for this vendor.");
+        return;
+      }
+
+      // Add all low stock items, skip duplicates
+      const existingIds = new Set(lineItems.map((li) => li.inventoryItemId));
+      const newItems: LineItem[] = lowStock
+        .filter((i: any) => !existingIds.has(i.id))
+        .map((i: any) => ({
+          inventoryItemId: i.id,
+          sku: i.sku,
+          name: i.name,
+          vendorSku: i.vendorSku || null,
+          description: i.name,
+          qtyOrdered: Math.max(1, ((i.reorderPoint || 5) + (i.reorderQty || 10)) - i.currentStock),
+          unitCost: Number(i.costPrice) || 0,
+          unitOfMeasure: i.unitOfMeasure || "Each",
+        }));
+
+      setLineItems((prev) => [...prev, ...newItems]);
+      setError(null);
+    } catch {
+      setError("Failed to auto-fill low stock items");
+    } finally {
+      setAutoFilling(false);
+    }
+  }, [selectedVendorId, lineItems]);
 
   // --- Update line item fields ---
   const updateLineItem = (
@@ -313,6 +360,20 @@ export default function NewPurchaseOrderPage() {
                 2
               </Badge>
               <h2 className="text-lg font-semibold">Add Items</h2>
+              <div className="ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={autoFillLowStock}
+                  disabled={autoFilling}
+                >
+                  {autoFilling ? (
+                    <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Filling...</>
+                  ) : (
+                    <><ShoppingCart className="mr-2 h-3.5 w-3.5" />Auto-fill Low Stock</>
+                  )}
+                </Button>
+              </div>
             </div>
 
             {/* Search bar */}
