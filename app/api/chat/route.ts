@@ -931,10 +931,33 @@ async function handleCreateSmartPO(
   });
 }
 
-async function handleAutoGeneratePOs(): Promise<string> {
-  // Replicate the logic from /api/po/auto-generate
+async function handleAutoGeneratePOs(input: Record<string, unknown> = {}): Promise<string> {
+  // Optional vendor filtering by IDs or names
+  const vendorIds = (input.vendorIds as string[]) || [];
+  const vendorNames = (input.vendorNames as string[]) || [];
+
+  // If vendorNames provided, look up their IDs
+  let resolvedVendorIds: string[] = [...vendorIds];
+  if (vendorNames.length > 0) {
+    const matchedVendors = await prisma.vendor.findMany({
+      where: {
+        OR: vendorNames.map((name) => ({
+          name: { contains: name, mode: "insensitive" as const },
+        })),
+      },
+      select: { id: true },
+    });
+    resolvedVendorIds.push(...matchedVendors.map((v) => v.id));
+  }
+
+  // Build query filter
+  const itemWhere: any = { isActive: true, vendorId: { not: null } };
+  if (resolvedVendorIds.length > 0) {
+    itemWhere.vendorId = { in: resolvedVendorIds };
+  }
+
   const allItems = await prisma.inventoryItem.findMany({
-    where: { isActive: true, vendorId: { not: null } },
+    where: itemWhere,
     include: { vendor: true },
   });
 
