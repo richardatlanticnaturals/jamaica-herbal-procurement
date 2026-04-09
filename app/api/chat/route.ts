@@ -103,13 +103,17 @@ const tools: Anthropic.Tool[] = [
   {
     name: "search_sales",
     description:
-      "Search sales data from Comcash POS by product name/keyword. Paginates through up to 500 recent sales, filters server-side, and returns aggregated totals with daily breakdown. Use this for questions like 'how many patties sold this week' or 'turmeric sales last 30 days'.",
+      "Search sales data by product name/keyword OR by category. Scans all sales in the date range. Use for 'how many patties sold this week', 'coffee category sales last 30 days', etc.",
     input_schema: {
       type: "object" as const,
       properties: {
         productSearch: {
           type: "string",
-          description: "Product name or keyword to search for (case-insensitive partial match). E.g. 'patt' matches 'Jamaican Patty', 'Beef Patty', etc.",
+          description: "Product name or keyword to search (partial match). E.g. 'patt' matches 'Vegan Patty'.",
+        },
+        category: {
+          type: "string",
+          description: "Search by category name. Looks up all products in this category, then finds their sales. E.g. 'Coffee' finds sales for Beet Root Latte, Espresso Shot, etc.",
         },
         days: {
           type: "number",
@@ -647,14 +651,26 @@ async function handleQueryVendors(
 async function handleSearchSales(
   input: Record<string, unknown>
 ): Promise<string> {
-  const productSearch = ((input.productSearch as string) || "").toLowerCase().trim();
+  let productSearch = ((input.productSearch as string) || "").toLowerCase().trim();
+  const categorySearch = ((input.category as string) || "").trim();
   const days = (input.days as number) || 7;
-  // No cap — scan ALL sales in the time period for accurate results
+
+  // If category is provided, look up product names in that category
+  let categoryProductNames: string[] = [];
+  if (categorySearch) {
+    const categoryItems = await prisma.inventoryItem.findMany({
+      where: { category: { contains: categorySearch, mode: "insensitive" }, isActive: true },
+      select: { name: true },
+    });
+    categoryProductNames = categoryItems.map((i) => i.name.toLowerCase());
+    if (categoryProductNames.length === 0) {
+      return JSON.stringify({ error: `No products found in category "${categorySearch}"`, matchedProducts: [], totalSales: 0 });
+    }
+  }
 
   try {
     const token = await authenticateEmployee();
 
-    // Calculate cutoff date (unix seconds)
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
     const cutoffUnix = Math.floor(cutoffDate.getTime() / 1000);
@@ -699,10 +715,6 @@ async function handleSearchSales(
           break;
         }
         allSales.push(sale);
-        if (allSales.length >= maxSales) {
-          keepFetching = false;
-          break;
-        }
       }
 
       offset += batch.length;
@@ -736,8 +748,13 @@ async function handleSearchSales(
         const title = (p.title || "").trim();
         const titleLower = title.toLowerCase();
 
-        // If productSearch is provided, filter
-        if (productSearch && !titleLower.includes(productSearch)) continue;
+        // Filter by product search OR category products
+        if (categoryProductNames.length > 0) {
+          // Category mode: match against any product name in the category
+          if (!categoryProductNames.some((cpn) => titleLower.includes(cpn) || cpn.includes(titleLower))) continue;
+        } else if (productSearch) {
+          if (!titleLower.includes(productSearch)) continue;
+        }
 
         const qty = parseFloat(p.quantity || "0") || 0;
         const revenue = parseFloat(p.totalForProduct || "0") || 0;
