@@ -583,19 +583,16 @@ export default function InventoryPage() {
             </div>
             <div className="grid gap-2">
               <Label>Vendor</Label>
-              <Select value={editVendorId} onValueChange={(v) => setEditVendorId(v || "none")}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select vendor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No vendor</SelectItem>
-                  {vendors.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
-                      {v.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                value={editVendorId}
+                onChange={(e) => setEditVendorId(e.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="none">No vendor</option>
+                {vendors.map((v: any) => (
+                  <option key={v.id} value={v.id}>{v.name}</option>
+                ))}
+              </select>
             </div>
             <div className="flex items-center gap-3">
               <Label htmlFor="edit-isActive" className="cursor-pointer">Active</Label>
