@@ -23,8 +23,9 @@ const SYSTEM_PROMPT = `Jamaica Herbal procurement assistant. Two stores: Lauderd
 Be concise. Use markdown tables. Format money as $X.XX.
 WRITES: Always dry run first, show summary, ask "Ready to apply? yes/no", only apply after confirmation. After applying, sync to Comcash.
 READS: No confirmation needed.
-SALES DATA: Use query_top_sellers for best sellers and query_slow_movers for items that haven't sold. Both use the local ProductSales cache (synced from Comcash). For real-time recent sales, use query_sales which calls the API directly.
+SALES DATA: Use query_top_sellers for best sellers and query_slow_movers for items that haven't sold. Both use the local ProductSales cache (synced from Comcash). For real-time recent sales, use query_sales which calls the API directly. If sales cache is empty, tell user to sync sales first.
 STOCK LEVELS: When answering stock level questions, always call refresh_stock first to ensure data is current. Tell the user "Refreshing stock from POS..." before showing results.
+PO STATUSES: DRAFT (not sent), PENDING_APPROVAL (needs approval), APPROVED (ready to send), SENT (sent to vendor, awaiting delivery), CONFIRMED (vendor confirmed), PARTIALLY_RECEIVED (some items received), RECEIVED (all received), CANCELLED, CLOSED. When user says "pending POs", they mean active undelivered POs: use status SENT or query with no status filter and explain the breakdown.
 Categories: Herbs & Teas, Vitamins & Supplements, Essential Oils, Hair & Beauty, Body Care, Food & Beverages, Incense & Spiritual, Accessories.`;
 
 // --- Tool definitions for Claude ---
@@ -37,7 +38,9 @@ const tools: Anthropic.Tool[] = [
       properties: {
         search: { type: "string" },
         status: { type: "string", enum: ["all", "low_stock", "out_of_stock"] },
-        vendorId: { type: "string" },
+        vendorId: { type: "string", description: "Filter by vendor ID" },
+        vendorName: { type: "string", description: "Filter by vendor name (searches by partial match)" },
+        category: { type: "string", description: "Filter by category name (partial match)" },
         limit: { type: "number" },
       },
       required: [],
@@ -394,8 +397,22 @@ async function handleQueryInventory(
 ): Promise<string> {
   const search = (input.search as string) || "";
   const status = (input.status as string) || "all";
-  const vendorId = (input.vendorId as string) || "";
+  const vendorName = (input.vendorName as string) || "";
+  const category = (input.category as string) || "";
   const limit = (input.limit as number) || 20;
+
+  // Resolve vendorName to vendorId if provided
+  let vendorId = (input.vendorId as string) || "";
+  if (vendorName && !vendorId) {
+    const vendor = await prisma.vendor.findFirst({
+      where: { name: { contains: vendorName, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (vendor) vendorId = vendor.id;
+    else {
+      return JSON.stringify({ items: [], count: 0, message: `No vendor found matching "${vendorName}"` });
+    }
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = { isActive: true };
@@ -411,6 +428,10 @@ async function handleQueryInventory(
     where.vendorId = vendorId;
   }
 
+  if (category) {
+    where.category = { contains: category, mode: "insensitive" };
+  }
+
   // low_stock needs in-memory filter because reorderPoint varies per item.
   // out_of_stock can be filtered at the DB level for efficiency.
   const needsInMemoryFilter = status === "low_stock";
@@ -419,10 +440,12 @@ async function handleQueryInventory(
     where.currentStock = { lte: 0 };
   }
 
+  // For low_stock, fetch all matching items since we filter in-memory
+  // and need to scan the full dataset to find items near their reorder point.
   const items = await prisma.inventoryItem.findMany({
     where,
-    take: needsInMemoryFilter ? 500 : limit,
-    orderBy: { name: "asc" },
+    take: needsInMemoryFilter ? 2000 : limit,
+    orderBy: needsInMemoryFilter ? { currentStock: "asc" } : { name: "asc" },
     include: {
       vendor: { select: { id: true, name: true } },
     },
@@ -459,7 +482,7 @@ async function handleQueryPurchaseOrders(
   const status = (input.status as string) || "";
   const vendorId = (input.vendorId as string) || "";
   const search = (input.search as string) || "";
-  const limit = (input.limit as number) || 20;
+  const limit = (input.limit as number) || 50;
   const dateFrom = (input.dateFrom as string) || "";
   const dateTo = (input.dateTo as string) || "";
 
@@ -514,7 +537,7 @@ async function handleQueryVendors(
   input: Record<string, unknown>
 ): Promise<string> {
   const search = (input.search as string) || "";
-  const limit = (input.limit as number) || 20;
+  const limit = (input.limit as number) || 50;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = { isActive: true };
@@ -604,7 +627,8 @@ async function handleQuerySales(
     if (timeFrom) body.timeFrom = timeFrom;
     if (timeTo) body.timeTo = timeTo;
 
-    const res = await fetch(`${COMCASH_OPENAPI_URL}/sale/list`, {
+    // Fix: Use /employee/sale/list path (matches all other Employee API endpoints)
+    const res = await fetch(`${COMCASH_OPENAPI_URL}/employee/sale/list`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1100,6 +1124,17 @@ async function handleQuerySlowMovers(
     const invWhere: any = { isActive: true };
     if (filterVendorId) invWhere.vendorId = filterVendorId;
 
+    // Check if ProductSales has any data — if not, we can't determine slow movers
+    const totalSalesRecords = await prisma.productSales.count();
+    if (totalSalesRecords === 0) {
+      return JSON.stringify({
+        source: "product_sales_cache",
+        items: [],
+        count: 0,
+        message: "No sales data available yet. Use 'Sync Sales' to import sales data from Comcash POS first. Without sales data, all items would appear as slow movers.",
+      });
+    }
+
     // Get all active inventory items
     const allItems = await prisma.inventoryItem.findMany({
       where: invWhere,
@@ -1210,6 +1245,17 @@ async function handleQueryTopSellers(
       if (filterVendorId) invFilter.vendorId = filterVendorId;
       if (category) invFilter.category = { contains: category, mode: "insensitive" };
       where.inventoryItem = invFilter;
+    }
+
+    // Check if ProductSales table has any data
+    const totalSalesRecords = await prisma.productSales.count();
+    if (totalSalesRecords === 0) {
+      return JSON.stringify({
+        source: "product_sales_cache",
+        items: [],
+        count: 0,
+        message: "No sales data available yet. Use 'Sync Sales' to import sales data from Comcash POS first.",
+      });
     }
 
     const topSellers = await prisma.productSales.findMany({
@@ -1581,7 +1627,7 @@ export async function POST(request: NextRequest) {
 
       const response = await anthropic.messages.create({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
+        max_tokens: 2048,
         system: SYSTEM_PROMPT,
         tools,
         messages: currentMessages,

@@ -235,6 +235,7 @@ model AppSettings {
   lastVendorSync      DateTime?
   lastProductSync     DateTime?
   lastStockSync       DateTime?
+  lastSalesSync       DateTime?
   defaultReorderPoint Int      @default(5)
   defaultReorderQty   Int      @default(12)
 }

@@ -78,7 +78,9 @@ export async function POST(req: NextRequest) {
     let reachedEnd = false;
 
     while (!reachedEnd) {
-      const res = await fetch(`${COMCASH_OPENAPI_URL}/sale/list`, {
+      // Fix: Use /employee/sale/list path (matches all other Employee API endpoints)
+      // Fix: Pass limit/offset as numbers, not strings (per Comcash API spec)
+      const res = await fetch(`${COMCASH_OPENAPI_URL}/employee/sale/list`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -86,8 +88,8 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${jwt}`,
         },
         body: JSON.stringify({
-          limit: String(pageSize),
-          offset: String(offset),
+          limit: pageSize,
+          offset,
           order: "desc",
         }),
       });
@@ -235,6 +237,9 @@ export async function POST(req: NextRequest) {
           const sku = inv?.sku || `COMCASH-${pid}`;
           const inventoryItemId = inv?.id || null;
 
+          // Fix: Round totalRevenue to 2 decimal places to avoid Decimal(10,2) precision errors
+          const roundedRevenue = Math.round(agg.totalRevenue * 100) / 100;
+
           await prisma.productSales.upsert({
             where: {
               sku_periodStart: {
@@ -246,7 +251,7 @@ export async function POST(req: NextRequest) {
               comcashProductId: pid,
               productName: agg.productName,
               totalQtySold: Math.round(agg.totalQtySold),
-              totalRevenue: agg.totalRevenue,
+              totalRevenue: roundedRevenue,
               lastSoldAt: agg.lastSoldAt,
               salesCount: agg.salesCount,
               periodEnd,
@@ -257,7 +262,7 @@ export async function POST(req: NextRequest) {
               comcashProductId: pid,
               productName: agg.productName,
               totalQtySold: Math.round(agg.totalQtySold),
-              totalRevenue: agg.totalRevenue,
+              totalRevenue: roundedRevenue,
               lastSoldAt: agg.lastSoldAt,
               salesCount: agg.salesCount,
               periodStart,
@@ -277,10 +282,10 @@ export async function POST(req: NextRequest) {
       await Promise.all(promises);
     }
 
-    // Update last sync timestamp in app settings
+    // Fix: Update lastSalesSync (not lastInventorySync) to track sales sync separately
     await prisma.appSettings.upsert({
       where: { id: "singleton" },
-      update: { lastInventorySync: new Date() },
+      update: { lastSalesSync: new Date() },
       create: { id: "singleton" },
     });
 
