@@ -32,7 +32,28 @@ export async function GET(
       return NextResponse.json({ error: "Purchase order not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ po });
+    // Enrich line items with sales data (qty sold in last 4 months)
+    const skus = po.lineItems
+      .map((li) => li.inventoryItem?.sku)
+      .filter(Boolean) as string[];
+
+    const salesData = skus.length > 0
+      ? await prisma.productSales.findMany({
+          where: { sku: { in: skus } },
+          select: { sku: true, totalQtySold: true },
+        })
+      : [];
+    const salesMap = new Map(salesData.map((s) => [s.sku, s.totalQtySold]));
+
+    const enrichedPO = {
+      ...po,
+      lineItems: po.lineItems.map((li) => ({
+        ...li,
+        qtySold4mo: salesMap.get(li.inventoryItem?.sku || "") ?? 0,
+      })),
+    };
+
+    return NextResponse.json({ po: enrichedPO });
   } catch (error) {
     console.error("Failed to fetch PO:", error);
     return NextResponse.json({ error: "Failed to fetch purchase order" }, { status: 500 });
