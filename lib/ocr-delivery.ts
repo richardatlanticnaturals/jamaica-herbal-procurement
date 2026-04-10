@@ -106,38 +106,57 @@ export async function ocrDeliverySlip(
     };
   }
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: [
-            contentBlock,
-            {
-              type: "text",
-              text: isPdf
-                ? "Extract all delivery/invoice information from this PDF document. Return ONLY the JSON object, no markdown fences."
-                : "Extract all delivery/invoice information from this image. Return ONLY the JSON object, no markdown fences.",
-            },
-          ],
-        },
-      ],
-      system: SYSTEM_PROMPT,
-    }),
-  });
+  // Retry logic for transient API errors (429, 529, 500)
+  const maxRetries = 3;
+  let response: Response | null = null;
+  let lastError = "";
 
-  if (!response.ok) {
-    const errBody = await response.text();
-    console.error("Claude API error:", response.status, errBody);
-    throw new Error(`Claude API error: ${response.status}`);
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    if (attempt > 0) {
+      // Wait before retry: 2s, 4s
+      await new Promise((r) => setTimeout(r, 2000 * attempt));
+      console.log(`[OCR] Retry attempt ${attempt + 1}/${maxRetries}...`);
+    }
+
+    response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        messages: [
+          {
+            role: "user",
+            content: [
+              contentBlock,
+              {
+                type: "text",
+                text: isPdf
+                  ? "Extract all delivery/invoice information from this PDF document. Return ONLY the JSON object, no markdown fences."
+                  : "Extract all delivery/invoice information from this image. Return ONLY the JSON object, no markdown fences.",
+              },
+            ],
+          },
+        ],
+        system: SYSTEM_PROMPT,
+      }),
+    });
+
+    if (response.ok) break;
+
+    lastError = await response.text();
+    console.error(`[OCR] Claude API error (attempt ${attempt + 1}):`, response.status, lastError);
+
+    // Only retry on overloaded/rate-limited errors
+    if (response.status !== 429 && response.status !== 529 && response.status !== 500) break;
+  }
+
+  if (!response || !response.ok) {
+    throw new Error(`Claude API error: ${response?.status || "unknown"} after ${maxRetries} attempts`);
   }
 
   const data = await response.json();
