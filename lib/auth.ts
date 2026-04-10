@@ -10,6 +10,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        // Admin login
         if (
           credentials?.email === "jamaicanherbal@gmail.com" &&
           credentials?.password === "jamaica2024"
@@ -18,6 +19,17 @@ export const authOptions: NextAuthOptions = {
             id: "1",
             name: "Jamaica Herbal",
             email: "jamaicanherbal@gmail.com",
+          };
+        }
+        // Employee login
+        if (
+          credentials?.email === "hello@jamaicaherbal.com" &&
+          credentials?.password === "jamaica4273"
+        ) {
+          return {
+            id: "2",
+            name: "Jamaica Herbal Employee",
+            email: "hello@jamaicaherbal.com",
           };
         }
         return null;
