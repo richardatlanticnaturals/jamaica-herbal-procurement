@@ -45,28 +45,40 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Get aggregated sales data for the period
-    // Sum totalQtySold across all ProductSales records that overlap our period
+    // Get ALL sales data from the cache (the cache already covers ~4 months)
+    // We don't filter by periodStart because the cache has one record per product
+    // spanning the entire sync period. We use the totalQtySold and adjust for our periodDays.
     const salesData = await prisma.productSales.findMany({
       where: {
-        periodStart: { gte: periodStart },
         totalQtySold: { gt: 0 },
       },
       select: {
         sku: true,
         totalQtySold: true,
         inventoryItemId: true,
+        periodStart: true,
+        periodEnd: true,
       },
     });
 
-    // Aggregate sales by SKU (there may be multiple records per SKU for different periods)
+    // Aggregate sales by SKU
+    // The cache may cover a different period (e.g. 120 days) than our requested period (90 days)
+    // We scale the qty proportionally: scaledQty = totalQtySold * (periodDays / cacheDays)
     const salesBySku: Record<string, number> = {};
     const salesByItemId: Record<string, number> = {};
     for (const sale of salesData) {
-      salesBySku[sale.sku] = (salesBySku[sale.sku] || 0) + sale.totalQtySold;
+      // Calculate how many days the cache covers for this record
+      const cacheStart = sale.periodStart ? new Date(sale.periodStart).getTime() : 0;
+      const cacheEnd = sale.periodEnd ? new Date(sale.periodEnd).getTime() : Date.now();
+      const cacheDays = Math.max(1, Math.round((cacheEnd - cacheStart) / (1000 * 60 * 60 * 24)));
+
+      // Scale to our requested period
+      const scaledQty = sale.totalQtySold * Math.min(1, periodDays / cacheDays);
+
+      salesBySku[sale.sku] = (salesBySku[sale.sku] || 0) + scaledQty;
       if (sale.inventoryItemId) {
         salesByItemId[sale.inventoryItemId] =
-          (salesByItemId[sale.inventoryItemId] || 0) + sale.totalQtySold;
+          (salesByItemId[sale.inventoryItemId] || 0) + scaledQty;
       }
     }
 
@@ -144,7 +156,7 @@ export async function POST(request: NextRequest) {
       itemsWithChanges: preview.length,
       applied: apply,
       appliedCount,
-      preview: preview.slice(0, 100), // Cap preview to 100 items
+      preview, // Return ALL items — no cap
     });
   } catch (error) {
     console.error("Auto-tune reorder points failed:", error);
