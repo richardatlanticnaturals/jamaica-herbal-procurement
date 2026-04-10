@@ -804,6 +804,20 @@ export default function PODetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {(!po.lineItems || po.lineItems.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <div className="text-muted-foreground">
+                          <p className="font-medium">No line item details available</p>
+                          {po.poNumber?.startsWith("CC-") ? (
+                            <p className="text-sm mt-1">This PO was imported from Comcash without item details. Total: ${Number(po.total).toFixed(2)}</p>
+                          ) : (
+                            <p className="text-sm mt-1">Click Edit to add items to this PO.</p>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {po.lineItems?.map((item: any) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-mono text-xs">
