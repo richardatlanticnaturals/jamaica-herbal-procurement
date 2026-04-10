@@ -128,7 +128,7 @@ export async function ocrDeliverySlip(
         },
         body: JSON.stringify({
           model,
-          max_tokens: 4096,
+          max_tokens: 8192,
           messages: [
             {
               role: "user",
@@ -189,14 +189,38 @@ export async function ocrDeliverySlip(
   try {
     parsed = JSON.parse(jsonStr);
   } catch {
-    // Try one more cleanup: remove any leading/trailing non-JSON characters
+    // Try cleanup: extract {...} from response
     const cleanMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (cleanMatch) {
       try {
         parsed = JSON.parse(cleanMatch[0]);
       } catch {
-        console.error("[OCR] Failed to parse OCR JSON after cleanup. Raw text:", rawText.substring(0, 500));
-        throw new Error("Failed to parse OCR response as JSON");
+        // JSON might be truncated (invoice too large for max_tokens)
+        // Try to repair by closing open arrays/objects
+        let repaired = cleanMatch[0];
+        // If it ends mid-item in the items array, close it
+        // Find the last complete item (ends with })
+        const lastCompleteItem = repaired.lastIndexOf("}");
+        if (lastCompleteItem > 0) {
+          repaired = repaired.substring(0, lastCompleteItem + 1);
+          // Count open brackets and close them
+          const openBrackets = (repaired.match(/\[/g) || []).length;
+          const closeBrackets = (repaired.match(/\]/g) || []).length;
+          const openBraces = (repaired.match(/\{/g) || []).length;
+          const closeBraces = (repaired.match(/\}/g) || []).length;
+          for (let i = 0; i < openBrackets - closeBrackets; i++) repaired += "]";
+          for (let i = 0; i < openBraces - closeBraces; i++) repaired += "}";
+          try {
+            parsed = JSON.parse(repaired);
+            console.log("[OCR] Repaired truncated JSON successfully");
+          } catch {
+            console.error("[OCR] Failed to repair truncated JSON. Raw text:", rawText.substring(0, 500));
+            throw new Error("Failed to parse OCR response as JSON");
+          }
+        } else {
+          console.error("[OCR] Failed to parse OCR JSON after cleanup. Raw text:", rawText.substring(0, 500));
+          throw new Error("Failed to parse OCR response as JSON");
+        }
       }
     } else {
       console.error("[OCR] No JSON object found in response. Raw text:", rawText.substring(0, 500));
