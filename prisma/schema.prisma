@@ -162,19 +162,20 @@ model POLineItem {
 }
 
 model Receiving {
-  id              String      @id @default(cuid())
-  purchaseOrderId String
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
-  receivedDate    DateTime    @default(now())
+  id              String         @id @default(cuid())
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  receivedDate    DateTime       @default(now())
   receivedBy      String?
   invoiceNumber   String?
   invoiceImageUrl String?
-  ocrRawText      String?     @db.Text
+  ocrRawText      String?        @db.Text
   ocrParsedData   Json?
-  matchStatus     MatchStatus @default(PENDING)
-  notes           String?     @db.Text
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  matchStatus     MatchStatus    @default(PENDING)
+  locationCode    String?        // "LL" or "NL" -- used by Quick Receive
+  notes           String?        @db.Text
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   lineItems ReceivingLineItem[]
 }

@@ -34,7 +34,10 @@ export async function GET(request: NextRequest) {
           lineItems: true,
           _count: { select: { lineItems: true } },
         },
-      }),
+      }).then((recs) =>
+        // Normalize: purchaseOrder may be null for Quick Receives
+        recs.map((r) => ({ ...r, purchaseOrder: r.purchaseOrder ?? null }))
+      ),
       prisma.receiving.count(),
     ]);
 

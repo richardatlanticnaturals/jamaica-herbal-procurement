@@ -46,33 +46,64 @@ Rules:
 - Do NOT invent data — only extract what is visible in the image`;
 
 /**
- * Sends a base64-encoded image to Claude Vision and extracts
+ * Sends a base64-encoded image or PDF to Claude Vision and extracts
  * structured delivery slip data.
+ *
+ * Supports both images (JPEG, PNG, GIF, WEBP) and PDF documents.
+ * For PDFs, uses Claude's document content block type.
  */
 export async function ocrDeliverySlip(
-  base64Image: string
+  base64Data: string
 ): Promise<OcrDeliveryResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured");
   }
 
-  // Strip data-url prefix if present
-  const imageData = base64Image.replace(/^data:image\/\w+;base64,/, "");
+  // Detect if this is a PDF or image from the data-url prefix
+  const isPdf = base64Data.startsWith("data:application/pdf");
 
-  // Detect media type from the data-url prefix, default to jpeg
-  let mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" =
-    "image/jpeg";
-  const prefixMatch = base64Image.match(/^data:(image\/\w+);base64,/);
-  if (prefixMatch) {
-    const detected = prefixMatch[1] as string;
-    if (
-      detected === "image/png" ||
-      detected === "image/gif" ||
-      detected === "image/webp"
-    ) {
-      mediaType = detected;
+  // Build the appropriate content block for Claude API
+  let contentBlock: Record<string, unknown>;
+
+  if (isPdf) {
+    // PDF: use document content block type
+    const pdfRawData = base64Data.replace(/^data:application\/pdf;base64,/, "");
+    contentBlock = {
+      type: "document",
+      source: {
+        type: "base64",
+        media_type: "application/pdf",
+        data: pdfRawData,
+      },
+    };
+  } else {
+    // Image: use image content block type
+    const imageData = base64Data.replace(/^data:image\/\w+;base64,/, "");
+
+    // Detect media type from the data-url prefix, default to jpeg
+    let mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" =
+      "image/jpeg";
+    const prefixMatch = base64Data.match(/^data:(image\/\w+);base64,/);
+    if (prefixMatch) {
+      const detected = prefixMatch[1] as string;
+      if (
+        detected === "image/png" ||
+        detected === "image/gif" ||
+        detected === "image/webp"
+      ) {
+        mediaType = detected;
+      }
     }
+
+    contentBlock = {
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: mediaType,
+        data: imageData,
+      },
+    };
   }
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -89,17 +120,12 @@ export async function ocrDeliverySlip(
         {
           role: "user",
           content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: mediaType,
-                data: imageData,
-              },
-            },
+            contentBlock,
             {
               type: "text",
-              text: "Extract all delivery/invoice information from this image. Return ONLY the JSON object, no markdown fences.",
+              text: isPdf
+                ? "Extract all delivery/invoice information from this PDF document. Return ONLY the JSON object, no markdown fences."
+                : "Extract all delivery/invoice information from this image. Return ONLY the JSON object, no markdown fences.",
             },
           ],
         },

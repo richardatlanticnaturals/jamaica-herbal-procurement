@@ -57,6 +57,14 @@ export async function POST(
       );
     }
 
+    // Guard: this endpoint is for PO-based receives only
+    if (!receiving.purchaseOrder) {
+      return NextResponse.json(
+        { error: "This receiving has no associated PO. Use /api/receiving/quick/confirm instead." },
+        { status: 400 }
+      );
+    }
+
     // Idempotency check — prevent double-confirm from doubling inventory
     if (receiving.matchStatus !== "PENDING") {
       return NextResponse.json(
@@ -126,7 +134,7 @@ export async function POST(
         // 2. Update the corresponding PO line item's qtyReceived
         if (recLine.inventoryItemId && item.qtyReceived > 0) {
           // Find the PO line item that matches this inventory item
-          const poLine = receiving.purchaseOrder.lineItems.find(
+          const poLine = receiving.purchaseOrder!.lineItems.find(
             (pl) => pl.inventoryItemId === recLine.inventoryItemId
           );
 
@@ -175,7 +183,7 @@ export async function POST(
       // 4. Determine new PO status
       // Reload the PO line items to get updated qtyReceived
       const updatedPoLines = await tx.pOLineItem.findMany({
-        where: { purchaseOrderId: receiving.purchaseOrderId },
+        where: { purchaseOrderId: receiving.purchaseOrderId! },
       });
 
       const allFullyReceived = updatedPoLines.every(
@@ -192,12 +200,12 @@ export async function POST(
         newPoStatus = null; // Don't change status if nothing was received
       }
 
-      const previousStatus = receiving.purchaseOrder.status;
+      const previousStatus = receiving.purchaseOrder!.status;
 
       // Update PO status only if there's something to update
       if (newPoStatus) {
         await tx.purchaseOrder.update({
-          where: { id: receiving.purchaseOrderId },
+          where: { id: receiving.purchaseOrderId! },
           data: {
             status: newPoStatus,
             receivedAt: allFullyReceived ? new Date() : undefined,
@@ -207,7 +215,7 @@ export async function POST(
         // Create POStatusLog entry
         await tx.pOStatusLog.create({
           data: {
-            purchaseOrderId: receiving.purchaseOrderId,
+            purchaseOrderId: receiving.purchaseOrderId!,
             fromStatus: previousStatus,
             toStatus: newPoStatus,
             note: `Receiving ${id} confirmed — ${lineItems.length} line items processed`,

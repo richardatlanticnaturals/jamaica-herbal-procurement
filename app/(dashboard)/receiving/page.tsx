@@ -18,6 +18,10 @@ import {
   RefreshCw,
   Package,
   Hash,
+  FileText,
+  Zap,
+  Search,
+  MapPin,
 } from "lucide-react";
 
 // ---------- Types ----------
@@ -76,10 +80,11 @@ interface PastReceiving {
   receivedDate: string;
   invoiceNumber: string | null;
   matchStatus: string;
+  locationCode: string | null;
   purchaseOrder: {
     poNumber: string;
     vendor: { name: string };
-  };
+  } | null;
   _count: { lineItems: number };
 }
 
@@ -91,19 +96,71 @@ interface EditableQty {
 // Mobile wizard steps
 type WizardStep = "select-po" | "take-photo" | "review-matches" | "confirm";
 
+// Receive mode toggle
+type ReceiveMode = "po" | "quick";
+
+// ---------- Quick Receive Types ----------
+
+interface QuickMatchCandidate {
+  inventoryItemId: string;
+  inventoryName: string;
+  inventorySku: string;
+  confidence: number;
+  currentStock: number;
+}
+
+interface QuickMatchedItem {
+  ocrItem: {
+    name: string;
+    qty: number;
+    unitPrice: number | null;
+    sku: string | null;
+  };
+  status: "EXACT" | "FUZZY" | "UNMATCHED";
+  topMatches: QuickMatchCandidate[];
+  selectedMatch: QuickMatchCandidate | null;
+}
+
+interface QuickReceiveResult {
+  ocrResult: {
+    vendorName: string | null;
+    invoiceNumber: string | null;
+    date: string | null;
+    items: any[];
+  };
+  matchedItems: QuickMatchedItem[];
+  locationCode: string | null;
+}
+
+interface InventorySearchResult {
+  id: string;
+  sku: string;
+  name: string;
+  currentStock: number;
+}
+
 // ---------- Component ----------
 
 export default function ReceivingPage() {
+  // Receive mode toggle: "po" (existing) or "quick" (new)
+  const [receiveMode, setReceiveMode] = useState<ReceiveMode>("po");
+
   // PO selection
   const [availablePOs, setAvailablePOs] = useState<PO[]>([]);
   const [selectedPOId, setSelectedPOId] = useState("");
   const [loadingPOs, setLoadingPOs] = useState(true);
 
-  // Image upload
+  // File upload (images + PDFs)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [isPdfFile, setIsPdfFile] = useState(false);
+
+  // Drag-and-drop state
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
 
   // Processing state
   const [processing, setProcessing] = useState(false);
@@ -131,6 +188,30 @@ export default function ReceivingPage() {
 
   // Swipe state for match cards (mobile)
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+
+  // ========== Quick Receive State ==========
+  const quickFileInputRef = useRef<HTMLInputElement>(null);
+  const quickGalleryInputRef = useRef<HTMLInputElement>(null);
+  const quickDropZoneRef = useRef<HTMLDivElement>(null);
+  const [quickImageBase64, setQuickImageBase64] = useState<string | null>(null);
+  const [quickImagePreview, setQuickImagePreview] = useState<string | null>(null);
+  const [quickFileName, setQuickFileName] = useState<string | null>(null);
+  const [quickIsPdf, setQuickIsPdf] = useState(false);
+  const [quickIsDragOver, setQuickIsDragOver] = useState(false);
+  const [quickLocationCode, setQuickLocationCode] = useState<"LL" | "NL">("LL");
+  const [quickProcessing, setQuickProcessing] = useState(false);
+  const [quickProcessingStep, setQuickProcessingStep] = useState("");
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [quickResult, setQuickResult] = useState<QuickReceiveResult | null>(null);
+  const [quickEditableItems, setQuickEditableItems] = useState<QuickMatchedItem[]>([]);
+  const [quickConfirming, setQuickConfirming] = useState(false);
+  const [quickConfirmed, setQuickConfirmed] = useState(false);
+  const [quickConfirmSummary, setQuickConfirmSummary] = useState<{ itemsReceived: number; totalQty: number } | null>(null);
+  // Inventory search modal for unmatched items
+  const [searchingForIndex, setSearchingForIndex] = useState<number | null>(null);
+  const [inventorySearchQuery, setInventorySearchQuery] = useState("");
+  const [inventorySearchResults, setInventorySearchResults] = useState<InventorySearchResult[]>([]);
+  const [inventorySearching, setInventorySearching] = useState(false);
 
   // Load available POs (SENT or CONFIRMED)
   const loadPOs = useCallback(async () => {
@@ -188,31 +269,82 @@ export default function ReceivingPage() {
     setRefreshing(false);
   };
 
-  // Handle image selection
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // Handle file selection (images and PDFs)
+  const handleFileSelect = (file: File) => {
     setError(null);
     setResult(null);
     setConfirmed(false);
+
+    const isFilePdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    setIsPdfFile(isFilePdf);
+    setUploadedFileName(file.name);
 
     // Revoke previous object URL to avoid memory leak
     if (imagePreview) {
       URL.revokeObjectURL(imagePreview);
     }
 
-    // Preview
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreview(previewUrl);
+    if (isFilePdf) {
+      // PDFs cannot be previewed as images -- show file name instead
+      setImagePreview(null);
+    } else {
+      // Image preview
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+    }
 
-    // Base64
+    // Base64 encode the file (works for both images and PDFs)
     const reader = new FileReader();
     reader.onload = () => {
       setImageBase64(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
+
+  // Handle file input change event
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    handleFileSelect(file);
+  };
+
+  // Drag-and-drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set false if leaving the drop zone entirely (not entering a child)
+    if (dropZoneRef.current && !dropZoneRef.current.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+
+    const file = files[0];
+    // Validate file type
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "application/pdf"];
+    const isValidByType = validTypes.includes(file.type);
+    const isValidByExt = /\.(jpg|jpeg|png|gif|webp|heic|pdf)$/i.test(file.name);
+
+    if (!isValidByType && !isValidByExt) {
+      setError("Please drop an image (JPG, PNG, HEIC) or PDF file.");
+      return;
+    }
+
+    handleFileSelect(file);
+  }, [imagePreview]);
 
   // Process the delivery slip
   const handleProcess = async () => {
@@ -222,7 +354,7 @@ export default function ReceivingPage() {
     setError(null);
     setResult(null);
     setConfirmed(false);
-    setProcessingStep("Sending image to OCR...");
+    setProcessingStep("Sending file to OCR...");
 
     try {
       setProcessingStep("Extracting items with AI vision...");
@@ -309,6 +441,9 @@ export default function ReceivingPage() {
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
     setImageBase64(null);
+    setUploadedFileName(null);
+    setIsPdfFile(false);
+    setIsDragOver(false);
     setResult(null);
     setEditableQtys({});
     setConfirmed(false);
@@ -317,6 +452,258 @@ export default function ReceivingPage() {
     setCurrentMatchIndex(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (galleryInputRef.current) galleryInputRef.current.value = "";
+  };
+
+  // ========== Quick Receive Handlers ==========
+
+  const handleQuickFileSelect = (file: File) => {
+    setQuickError(null);
+    setQuickResult(null);
+    setQuickConfirmed(false);
+
+    const isFilePdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    setQuickIsPdf(isFilePdf);
+    setQuickFileName(file.name);
+
+    if (quickImagePreview) URL.revokeObjectURL(quickImagePreview);
+    if (isFilePdf) {
+      setQuickImagePreview(null);
+    } else {
+      setQuickImagePreview(URL.createObjectURL(file));
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => setQuickImageBase64(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleQuickImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleQuickFileSelect(file);
+  };
+
+  const handleQuickDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setQuickIsDragOver(true);
+  }, []);
+
+  const handleQuickDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (quickDropZoneRef.current && !quickDropZoneRef.current.contains(e.relatedTarget as Node)) {
+      setQuickIsDragOver(false);
+    }
+  }, []);
+
+  const handleQuickDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setQuickIsDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+    const file = files[0];
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "application/pdf"];
+    const isValidByType = validTypes.includes(file.type);
+    const isValidByExt = /\.(jpg|jpeg|png|gif|webp|heic|pdf)$/i.test(file.name);
+    if (!isValidByType && !isValidByExt) {
+      setQuickError("Please drop an image (JPG, PNG, HEIC) or PDF file.");
+      return;
+    }
+    handleQuickFileSelect(file);
+  }, [quickImagePreview]);
+
+  // Process Quick Receive OCR
+  const handleQuickProcess = async () => {
+    if (!quickImageBase64) return;
+    setQuickProcessing(true);
+    setQuickError(null);
+    setQuickResult(null);
+    setQuickConfirmed(false);
+    setQuickProcessingStep("Running OCR on invoice...");
+
+    try {
+      const res = await fetch("/api/receiving/quick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: quickImageBase64,
+          locationCode: quickLocationCode,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to process invoice");
+      }
+
+      setQuickProcessingStep("Matching items to inventory...");
+      const data: QuickReceiveResult = await res.json();
+      setQuickResult(data);
+      // Make editable copies of matched items
+      setQuickEditableItems(
+        data.matchedItems.map((m) => ({
+          ...m,
+          ocrItem: { ...m.ocrItem },
+          topMatches: [...m.topMatches],
+          selectedMatch: m.selectedMatch ? { ...m.selectedMatch } : null,
+        }))
+      );
+    } catch (err) {
+      setQuickError(err instanceof Error ? err.message : "Processing failed");
+    } finally {
+      setQuickProcessing(false);
+      setQuickProcessingStep("");
+    }
+  };
+
+  // Confirm Quick Receive
+  const handleQuickConfirm = async () => {
+    if (quickEditableItems.length === 0) return;
+    setQuickConfirming(true);
+    setQuickError(null);
+
+    try {
+      // Only send items that have a selected match and qty > 0
+      const items = quickEditableItems
+        .filter((m) => m.selectedMatch && m.ocrItem.qty > 0)
+        .map((m) => ({
+          inventoryItemId: m.selectedMatch!.inventoryItemId,
+          qtyReceived: m.ocrItem.qty,
+          matchStatus: m.status === "UNMATCHED" ? "MANUAL" : m.status,
+          ocrDescription: m.ocrItem.name,
+          ocrUnitCost: m.ocrItem.unitPrice,
+        }));
+
+      if (items.length === 0) {
+        setQuickError("No matched items to receive. Match at least one item.");
+        setQuickConfirming(false);
+        return;
+      }
+
+      const res = await fetch("/api/receiving/quick/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items,
+          locationCode: quickLocationCode,
+          invoiceNumber: quickResult?.ocrResult.invoiceNumber || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to confirm");
+      }
+
+      const confirmData = await res.json();
+      setQuickConfirmed(true);
+      setQuickConfirmSummary({
+        itemsReceived: confirmData.itemsReceived,
+        totalQty: confirmData.totalQtyReceived,
+      });
+      // Reload past receivings
+      loadPastReceivings(1);
+      setPastPage(1);
+    } catch (err) {
+      setQuickError(err instanceof Error ? err.message : "Confirmation failed");
+    } finally {
+      setQuickConfirming(false);
+    }
+  };
+
+  // Reset Quick Receive
+  const handleQuickReset = () => {
+    if (quickImagePreview) URL.revokeObjectURL(quickImagePreview);
+    setQuickImageBase64(null);
+    setQuickImagePreview(null);
+    setQuickFileName(null);
+    setQuickIsPdf(false);
+    setQuickIsDragOver(false);
+    setQuickResult(null);
+    setQuickEditableItems([]);
+    setQuickConfirmed(false);
+    setQuickConfirmSummary(null);
+    setQuickError(null);
+    setSearchingForIndex(null);
+    setInventorySearchQuery("");
+    setInventorySearchResults([]);
+    if (quickFileInputRef.current) quickFileInputRef.current.value = "";
+    if (quickGalleryInputRef.current) quickGalleryInputRef.current.value = "";
+  };
+
+  // Update qty for a quick receive item
+  const handleQuickQtyChange = (index: number, qty: number) => {
+    setQuickEditableItems((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? { ...item, ocrItem: { ...item.ocrItem, qty: Math.max(0, qty) } }
+          : item
+      )
+    );
+  };
+
+  // Select a different match candidate for a quick receive item
+  const handleQuickSelectMatch = (itemIndex: number, candidate: QuickMatchCandidate) => {
+    setQuickEditableItems((prev) =>
+      prev.map((item, i) =>
+        i === itemIndex
+          ? { ...item, selectedMatch: candidate, status: candidate.confidence >= 0.9 ? "EXACT" : "FUZZY" }
+          : item
+      )
+    );
+  };
+
+  // Remove/reject a quick receive item
+  const handleQuickRejectItem = (index: number) => {
+    setQuickEditableItems((prev) =>
+      prev.map((item, i) =>
+        i === index ? { ...item, selectedMatch: null, status: "UNMATCHED" } : item
+      )
+    );
+  };
+
+  // Search inventory for unmatched items
+  const handleInventorySearch = async (query: string) => {
+    setInventorySearchQuery(query);
+    if (query.trim().length < 2) {
+      setInventorySearchResults([]);
+      return;
+    }
+    setInventorySearching(true);
+    try {
+      const res = await fetch(`/api/inventory/search?q=${encodeURIComponent(query.trim())}`);
+      const data = await res.json();
+      setInventorySearchResults(data.items || []);
+    } catch {
+      setInventorySearchResults([]);
+    } finally {
+      setInventorySearching(false);
+    }
+  };
+
+  // Assign a manually searched inventory item to a quick receive line
+  const handleAssignInventoryItem = (itemIndex: number, invItem: InventorySearchResult) => {
+    setQuickEditableItems((prev) =>
+      prev.map((item, i) =>
+        i === itemIndex
+          ? {
+              ...item,
+              selectedMatch: {
+                inventoryItemId: invItem.id,
+                inventoryName: invItem.name,
+                inventorySku: invItem.sku,
+                confidence: 1.0,
+                currentStock: invItem.currentStock,
+              },
+              status: "FUZZY" as const, // Manual assignment treated as FUZZY in the UI
+            }
+          : item
+      )
+    );
+    setSearchingForIndex(null);
+    setInventorySearchQuery("");
+    setInventorySearchResults([]);
   };
 
   // Select PO and advance wizard
@@ -416,13 +803,527 @@ export default function ReceivingPage() {
         </Button>
       </div>
 
+      {/* ========== Receive Mode Tabs ========== */}
+      <div className="flex rounded-lg border bg-muted p-1 gap-1">
+        <button
+          onClick={() => setReceiveMode("po")}
+          className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            receiveMode === "po"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <PackageCheck className="h-4 w-4" />
+          PO Receive
+        </button>
+        <button
+          onClick={() => setReceiveMode("quick")}
+          className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            receiveMode === "quick"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Zap className="h-4 w-4" />
+          Quick Receive
+        </button>
+      </div>
+
+      {/* ========== QUICK RECEIVE MODE ========== */}
+      {receiveMode === "quick" && (
+        <>
+          <Card>
+            <CardContent className="pt-6 space-y-6">
+              <div className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-500" />
+                <h2 className="text-lg font-semibold">Quick Receive</h2>
+                <Badge variant="outline" className="text-xs">No PO Required</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Upload an invoice or packing slip photo. The system will OCR the items and match them to your inventory.
+              </p>
+
+              {quickConfirmed ? (
+                /* ---- Quick Receive Confirmed ---- */
+                <div className="flex flex-col items-center py-10 space-y-4">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                    <CheckCircle2 className="h-8 w-8 text-green-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-green-700">
+                    Quick Receive Confirmed
+                  </h3>
+                  <p className="text-sm text-muted-foreground text-center max-w-sm">
+                    {quickConfirmSummary
+                      ? `${quickConfirmSummary.itemsReceived} items received (${quickConfirmSummary.totalQty} total units). Stock updated.`
+                      : "Stock has been updated."}
+                  </p>
+                  <Button onClick={handleQuickReset} className="h-12 px-6 text-base">
+                    Receive Another Delivery
+                  </Button>
+                </div>
+              ) : quickResult && quickEditableItems.length > 0 ? (
+                /* ---- Quick Receive Review Table ---- */
+                <div className="space-y-4">
+                  {/* OCR info summary */}
+                  {quickResult.ocrResult.vendorName && (
+                    <div className="flex flex-wrap gap-3 text-sm">
+                      <span className="text-muted-foreground">
+                        Vendor: <strong>{quickResult.ocrResult.vendorName}</strong>
+                      </span>
+                      {quickResult.ocrResult.invoiceNumber && (
+                        <span className="text-muted-foreground">
+                          Invoice: <strong className="font-mono">{quickResult.ocrResult.invoiceNumber}</strong>
+                        </span>
+                      )}
+                      {quickResult.ocrResult.date && (
+                        <span className="text-muted-foreground">
+                          Date: <strong>{quickResult.ocrResult.date}</strong>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Match summary */}
+                  <div className="flex gap-3 text-sm">
+                    <Badge className="bg-green-100 text-green-700 border-green-200">
+                      {quickEditableItems.filter((m) => m.status === "EXACT").length} Exact
+                    </Badge>
+                    <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
+                      {quickEditableItems.filter((m) => m.status === "FUZZY").length} Fuzzy
+                    </Badge>
+                    <Badge className="bg-red-100 text-red-700 border-red-200">
+                      {quickEditableItems.filter((m) => m.status === "UNMATCHED" && !m.selectedMatch).length} Unmatched
+                    </Badge>
+                  </div>
+
+                  {/* Review table */}
+                  <div className="rounded-lg border overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-left p-3 font-medium">OCR Item</th>
+                          <th className="text-left p-3 font-medium">Matched Product</th>
+                          <th className="text-center p-3 font-medium">Confidence</th>
+                          <th className="text-center p-3 font-medium w-24">Qty</th>
+                          <th className="text-center p-3 font-medium w-32">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {quickEditableItems.map((item, index) => {
+                          const rowBg =
+                            item.status === "EXACT"
+                              ? "bg-green-50"
+                              : item.status === "FUZZY"
+                                ? "bg-yellow-50"
+                                : "bg-red-50";
+                          return (
+                            <tr key={index} className={`border-b ${rowBg}`}>
+                              {/* OCR Item Name */}
+                              <td className="p-3">
+                                <div className="font-medium">{item.ocrItem.name}</div>
+                                {item.ocrItem.sku && (
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    SKU: {item.ocrItem.sku}
+                                  </div>
+                                )}
+                                {item.ocrItem.unitPrice !== null && (
+                                  <div className="text-xs text-muted-foreground">
+                                    ${Number(item.ocrItem.unitPrice).toFixed(2)}
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* Matched Product */}
+                              <td className="p-3">
+                                {item.selectedMatch ? (
+                                  <div>
+                                    <div className="font-medium">{item.selectedMatch.inventoryName}</div>
+                                    <div className="text-xs text-muted-foreground font-mono">
+                                      {item.selectedMatch.inventorySku}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      Stock: {item.selectedMatch.currentStock}
+                                    </div>
+                                    {/* Show alternative matches dropdown */}
+                                    {item.topMatches.length > 1 && (
+                                      <select
+                                        className="mt-1 text-xs border rounded px-1 py-0.5 bg-background"
+                                        value={item.selectedMatch.inventoryItemId}
+                                        onChange={(e) => {
+                                          const candidate = item.topMatches.find(
+                                            (c) => c.inventoryItemId === e.target.value
+                                          );
+                                          if (candidate) handleQuickSelectMatch(index, candidate);
+                                        }}
+                                      >
+                                        {item.topMatches.map((c) => (
+                                          <option key={c.inventoryItemId} value={c.inventoryItemId}>
+                                            {c.inventoryName} ({Math.round(c.confidence * 100)}%)
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-muted-foreground italic">
+                                    No match found
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="ml-2 h-7 text-xs gap-1"
+                                      onClick={() => {
+                                        setSearchingForIndex(index);
+                                        setInventorySearchQuery(item.ocrItem.name);
+                                        handleInventorySearch(item.ocrItem.name);
+                                      }}
+                                    >
+                                      <Search className="h-3 w-3" />
+                                      Search
+                                    </Button>
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* Confidence */}
+                              <td className="p-3 text-center">
+                                {statusBadge(
+                                  item.status,
+                                  item.selectedMatch?.confidence ?? 0
+                                )}
+                              </td>
+
+                              {/* Qty */}
+                              <td className="p-3 text-center">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  value={item.ocrItem.qty}
+                                  onChange={(e) =>
+                                    handleQuickQtyChange(index, parseInt(e.target.value) || 0)
+                                  }
+                                  className="w-20 h-8 text-center mx-auto"
+                                />
+                              </td>
+
+                              {/* Action */}
+                              <td className="p-3 text-center">
+                                {item.selectedMatch ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-600 hover:text-red-700 h-7 text-xs"
+                                    onClick={() => handleQuickRejectItem(index)}
+                                  >
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                    Reject
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs gap-1"
+                                    onClick={() => {
+                                      setSearchingForIndex(index);
+                                      setInventorySearchQuery(item.ocrItem.name);
+                                      handleInventorySearch(item.ocrItem.name);
+                                    }}
+                                  >
+                                    <Search className="h-3 w-3" />
+                                    Find
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Inventory Search Modal (inline) */}
+                  {searchingForIndex !== null && (
+                    <div className="rounded-lg border bg-background p-4 space-y-3 shadow-lg">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold flex items-center gap-2">
+                          <Search className="h-4 w-4" />
+                          Search Inventory
+                        </h4>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSearchingForIndex(null);
+                            setInventorySearchQuery("");
+                            setInventorySearchResults([]);
+                          }}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Finding match for: <strong>{quickEditableItems[searchingForIndex]?.ocrItem.name}</strong>
+                      </p>
+                      <Input
+                        placeholder="Type to search by name or SKU..."
+                        value={inventorySearchQuery}
+                        onChange={(e) => handleInventorySearch(e.target.value)}
+                        className="h-9"
+                        autoFocus
+                      />
+                      {inventorySearching && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Searching...
+                        </div>
+                      )}
+                      {inventorySearchResults.length > 0 && (
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {inventorySearchResults.map((inv) => (
+                            <button
+                              key={inv.id}
+                              onClick={() => handleAssignInventoryItem(searchingForIndex!, inv)}
+                              className="w-full text-left p-2 rounded hover:bg-muted transition-colors text-sm flex items-center justify-between"
+                            >
+                              <div>
+                                <div className="font-medium">{inv.name}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{inv.sku}</div>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Stock: {inv.currentStock}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {!inventorySearching && inventorySearchQuery.length >= 2 && inventorySearchResults.length === 0 && (
+                        <p className="text-xs text-muted-foreground">No inventory items found.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {quickError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      {quickError}
+                    </div>
+                  )}
+
+                  {/* Confirm + Reset buttons */}
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={handleQuickConfirm}
+                      disabled={quickConfirming || quickEditableItems.filter((m) => m.selectedMatch && m.ocrItem.qty > 0).length === 0}
+                      className="flex-1 h-12 text-base gap-2"
+                    >
+                      {quickConfirming ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Updating Stock...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" />
+                          Confirm Receive ({quickEditableItems.filter((m) => m.selectedMatch && m.ocrItem.qty > 0).length} items)
+                        </>
+                      )}
+                    </Button>
+                    <Button variant="outline" onClick={handleQuickReset} className="h-12">
+                      Start Over
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* ---- Quick Receive Upload ---- */
+                <div className="space-y-4">
+                  {/* Location selector */}
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Receiving at <strong>Lauderdale Lakes</strong>
+                    </p>
+                  </div>
+
+                  {/* Hidden file inputs */}
+                  <input
+                    ref={quickFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleQuickImageSelect}
+                    className="hidden"
+                    disabled={quickProcessing}
+                  />
+                  <input
+                    ref={quickGalleryInputRef}
+                    type="file"
+                    accept="image/*,.pdf,application/pdf"
+                    onChange={handleQuickImageSelect}
+                    className="hidden"
+                    disabled={quickProcessing}
+                  />
+
+                  {/* Drop zone */}
+                  {!quickImageBase64 && (
+                    <div
+                      ref={quickDropZoneRef}
+                      onDragOver={handleQuickDragOver}
+                      onDragLeave={handleQuickDragLeave}
+                      onDrop={handleQuickDrop}
+                      className={`relative rounded-xl border-2 border-dashed transition-colors p-6 md:p-10 text-center cursor-pointer ${
+                        quickIsDragOver
+                          ? "border-primary bg-primary/5"
+                          : "border-muted-foreground/25 hover:border-muted-foreground/50 bg-muted/30"
+                      }`}
+                      onClick={() => quickGalleryInputRef.current?.click()}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          quickGalleryInputRef.current?.click();
+                        }
+                      }}
+                    >
+                      <div className="flex flex-col items-center gap-3">
+                        <div className={`rounded-full p-3 ${quickIsDragOver ? "bg-primary/10" : "bg-muted"}`}>
+                          <Upload className={`h-8 w-8 ${quickIsDragOver ? "text-primary" : "text-muted-foreground"}`} />
+                        </div>
+                        <div>
+                          <p className={`text-sm font-medium ${quickIsDragOver ? "text-primary" : "text-foreground"}`}>
+                            {quickIsDragOver ? "Drop file here" : "Drag invoice or packing slip here"}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Supports JPG, PNG, HEIC, and PDF files
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mobile upload buttons */}
+                  {!quickImageBase64 && (
+                    <div className="md:hidden space-y-3">
+                      <Button
+                        onClick={() => quickFileInputRef.current?.click()}
+                        disabled={quickProcessing}
+                        className="w-full gap-3 text-base"
+                        style={{ minHeight: "56px" }}
+                      >
+                        <Camera className="h-5 w-5" />
+                        Take Photo
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => quickGalleryInputRef.current?.click()}
+                        disabled={quickProcessing}
+                        className="w-full gap-3 text-base"
+                        style={{ minHeight: "48px" }}
+                      >
+                        <Upload className="h-5 w-5" />
+                        Upload File
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Desktop upload buttons */}
+                  {!quickImageBase64 && (
+                    <div className="hidden md:flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => quickFileInputRef.current?.click()}
+                        disabled={quickProcessing}
+                        className="gap-2"
+                      >
+                        <Camera className="h-4 w-4" />
+                        Camera
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => quickGalleryInputRef.current?.click()}
+                        disabled={quickProcessing}
+                        className="gap-2"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Upload File
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* File preview */}
+                  {quickImageBase64 && (
+                    <div className="space-y-3">
+                      {quickIsPdf ? (
+                        <div className="flex items-center gap-3 p-4 rounded-lg border bg-muted/50">
+                          <FileText className="h-8 w-8 text-red-500 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{quickFileName}</p>
+                            <p className="text-xs text-muted-foreground">PDF document ready for OCR</p>
+                          </div>
+                        </div>
+                      ) : quickImagePreview ? (
+                        <div className="relative rounded-lg overflow-hidden border max-h-64">
+                          <img
+                            src={quickImagePreview}
+                            alt="Invoice preview"
+                            className="w-full h-auto max-h-64 object-contain"
+                          />
+                        </div>
+                      ) : null}
+
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={handleQuickProcess}
+                          disabled={quickProcessing}
+                          className="flex-1 h-12 text-base gap-2"
+                        >
+                          {quickProcessing ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              {quickProcessingStep || "Processing..."}
+                            </>
+                          ) : (
+                            <>
+                              <PackageCheck className="h-4 w-4" />
+                              Process Invoice
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleQuickReset}
+                          disabled={quickProcessing}
+                          className="h-12"
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {quickError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      {quickError}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* ========== PO RECEIVE MODE ========== */}
+      {receiveMode === "po" && (
+      <>
+
       {/* ========== Mobile Wizard Progress (hidden on desktop) ========== */}
       {!confirmed && (
         <div className="flex items-center gap-1 md:hidden">
           {(
             [
               { step: "select-po", label: "PO" },
-              { step: "take-photo", label: "Photo" },
+              { step: "take-photo", label: "Upload" },
               { step: "review-matches", label: "Review" },
               { step: "confirm", label: "Done" },
             ] as { step: WizardStep; label: string }[]
@@ -636,10 +1537,11 @@ export default function ReceivingPage() {
                   <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold md:hidden">
                     2
                   </span>
-                  Delivery Slip Photo
+                  Delivery Slip / Invoice
                 </label>
 
                 {/* Hidden file inputs */}
+                {/* Camera input -- only uses capture on mobile (detected by presence of touch) */}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -650,65 +1552,111 @@ export default function ReceivingPage() {
                   id="delivery-photo"
                   disabled={processing}
                 />
+                {/* Gallery/file upload input -- accepts images and PDFs, no capture */}
                 <input
                   ref={galleryInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.pdf,application/pdf"
                   onChange={handleImageSelect}
                   className="hidden"
                   id="delivery-gallery"
                   disabled={processing}
                 />
 
-                {/* Mobile: large camera button */}
+                {/* Drag-and-drop zone -- visible when no file is selected */}
+                {!imageBase64 && (
+                  <div
+                    ref={dropZoneRef}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`relative rounded-xl border-2 border-dashed transition-colors p-6 md:p-10 text-center cursor-pointer ${
+                      isDragOver
+                        ? "border-primary bg-primary/5"
+                        : "border-muted-foreground/25 hover:border-muted-foreground/50 bg-muted/30"
+                    }`}
+                    onClick={() => galleryInputRef.current?.click()}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        galleryInputRef.current?.click();
+                      }
+                    }}
+                  >
+                    <div className="flex flex-col items-center gap-3">
+                      <div className={`rounded-full p-3 ${isDragOver ? "bg-primary/10" : "bg-muted"}`}>
+                        <Upload className={`h-8 w-8 ${isDragOver ? "text-primary" : "text-muted-foreground"}`} />
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${isDragOver ? "text-primary" : "text-foreground"}`}>
+                          {isDragOver ? "Drop file here" : "Drag invoice or delivery slip here"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Supports JPG, PNG, HEIC, and PDF files
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mobile: large camera + upload buttons */}
                 <div className="md:hidden space-y-3">
-                  <Button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={processing}
-                    className="w-full gap-3 text-base"
-                    style={{ minHeight: "56px" }}
-                  >
-                    <Camera className="h-5 w-5" />
-                    Take Photo of Delivery Slip
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => galleryInputRef.current?.click()}
-                    disabled={processing}
-                    className="w-full gap-3 text-base"
-                    style={{ minHeight: "48px" }}
-                  >
-                    <Upload className="h-5 w-5" />
-                    Upload from Gallery
-                  </Button>
+                  {!imageBase64 && (
+                    <>
+                      <Button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={processing}
+                        className="w-full gap-3 text-base"
+                        style={{ minHeight: "56px" }}
+                      >
+                        <Camera className="h-5 w-5" />
+                        Take Photo
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => galleryInputRef.current?.click()}
+                        disabled={processing}
+                        className="w-full gap-3 text-base"
+                        style={{ minHeight: "48px" }}
+                      >
+                        <Upload className="h-5 w-5" />
+                        Upload File (Image or PDF)
+                      </Button>
+                    </>
+                  )}
                 </div>
 
-                {/* Desktop: standard buttons */}
-                <div className="hidden md:flex gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={processing}
-                    className="gap-2"
-                  >
-                    <Camera className="h-4 w-4" />
-                    Take Photo
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => galleryInputRef.current?.click()}
-                    disabled={processing}
-                    className="gap-2"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload File
-                  </Button>
-                </div>
+                {/* Desktop: standard buttons (shown below drop zone) */}
+                {!imageBase64 && (
+                  <div className="hidden md:flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={processing}
+                      className="gap-2"
+                    >
+                      <Camera className="h-4 w-4" />
+                      Take Photo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => galleryInputRef.current?.click()}
+                      disabled={processing}
+                      className="gap-2"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Upload File
+                    </Button>
+                  </div>
+                )}
 
+                {/* File preview: image or PDF indicator */}
                 {imagePreview && (
                   <div className="mt-3 relative">
                     <img
@@ -716,6 +1664,33 @@ export default function ReceivingPage() {
                       alt="Delivery slip preview"
                       className="max-h-48 md:max-h-64 rounded-lg border object-contain w-full"
                     />
+                    {uploadedFileName && (
+                      <p className="text-xs text-muted-foreground mt-1 truncate">{uploadedFileName}</p>
+                    )}
+                  </div>
+                )}
+                {isPdfFile && imageBase64 && !imagePreview && (
+                  <div className="mt-3 flex items-center gap-3 p-4 rounded-lg border bg-muted/50">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-red-100 shrink-0">
+                      <FileText className="h-6 w-6 text-red-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{uploadedFileName || "PDF Document"}</p>
+                      <p className="text-xs text-muted-foreground">PDF file ready for OCR processing</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setImageBase64(null);
+                        setUploadedFileName(null);
+                        setIsPdfFile(false);
+                        if (galleryInputRef.current) galleryInputRef.current.value = "";
+                      }}
+                      className="text-xs shrink-0"
+                    >
+                      Remove
+                    </Button>
                   </div>
                 )}
               </div>
@@ -1113,6 +2088,9 @@ export default function ReceivingPage() {
         </CardContent>
       </Card>
 
+      </>
+      )}
+
       {/* ========== Past Receivings Section ========== */}
       <Card>
         <CardContent className="pt-6 space-y-4">
@@ -1137,12 +2115,14 @@ export default function ReceivingPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-sm font-semibold">
-                        {rec.purchaseOrder.poNumber}
+                        {rec.purchaseOrder ? rec.purchaseOrder.poNumber : (
+                          <Badge variant="outline" className="text-xs font-normal">Quick Receive</Badge>
+                        )}
                       </span>
                       {receivingStatusBadge(rec.matchStatus)}
                     </div>
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>{rec.purchaseOrder.vendor.name}</span>
+                      <span>{rec.purchaseOrder ? rec.purchaseOrder.vendor.name : (rec.locationCode === "LL" ? "Lauderdale Lakes" : rec.locationCode === "NL" ? "North Lauderdale" : "--")}</span>
                       <span>
                         {new Date(rec.receivedDate).toLocaleDateString()}
                       </span>
@@ -1191,10 +2171,16 @@ export default function ReceivingPage() {
                           ).toLocaleDateString()}
                         </td>
                         <td className="p-3 font-mono text-sm">
-                          {rec.purchaseOrder.poNumber}
+                          {rec.purchaseOrder ? rec.purchaseOrder.poNumber : (
+                            <Badge variant="outline" className="text-xs font-normal">Quick Receive</Badge>
+                          )}
                         </td>
                         <td className="p-3 text-sm">
-                          {rec.purchaseOrder.vendor.name}
+                          {rec.purchaseOrder ? rec.purchaseOrder.vendor.name : (
+                            <span className="text-muted-foreground">
+                              {rec.locationCode === "LL" ? "Lauderdale Lakes" : rec.locationCode === "NL" ? "North Lauderdale" : "--"}
+                            </span>
+                          )}
                         </td>
                         <td className="p-3 text-sm font-mono">
                           {rec.invoiceNumber || "--"}
