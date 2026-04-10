@@ -268,6 +268,7 @@ export default function CategoriesPage() {
                 No items found.
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -315,6 +316,7 @@ export default function CategoriesPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>

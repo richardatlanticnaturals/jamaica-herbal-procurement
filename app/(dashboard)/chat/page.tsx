@@ -202,19 +202,19 @@ export default function ChatPage() {
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
+      <div className="flex items-center justify-between border-b px-3 sm:px-4 py-3 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
             <Sparkles className="h-4 w-4 text-white" />
           </div>
-          <div>
-            <h1 className="text-sm font-semibold">AI Procurement Assistant</h1>
-            <p className="text-xs text-muted-foreground">
+          <div className="min-w-0">
+            <h1 className="text-sm font-semibold truncate">AI Procurement Assistant</h1>
+            <p className="text-xs text-muted-foreground hidden sm:block">
               Ask about inventory, POs, vendors, or sales
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {sessionTotals.totalTokens > 0 && (
             <span className="text-[11px] text-muted-foreground/70 tabular-nums">
               Session: {formatTokens(sessionTotals.totalTokens)} tokens &middot; {formatCost(sessionTotals.cost)}
@@ -400,7 +400,7 @@ export default function ChatPage() {
               placeholder="Ask about inventory, POs, vendors, or sales..."
               rows={1}
               disabled={isLoading}
-              className="w-full resize-none rounded-xl border bg-background px-4 py-3 pr-12 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              className="w-full resize-none rounded-xl border bg-background px-4 py-3 pr-12 text-base sm:text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             />
           </div>
           <Button

@@ -112,7 +112,7 @@ function InlineEditableCell({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={commitEdit}
         onKeyDown={handleKeyDown}
-        className="h-7 w-full min-w-[50px] rounded border border-primary bg-white px-2 text-sm outline-none focus:ring-1 focus:ring-primary"
+        className="h-9 w-full min-w-[50px] rounded border border-primary bg-white px-2 text-base sm:text-sm outline-none focus:ring-1 focus:ring-primary"
       />
     );
   }
@@ -573,7 +573,7 @@ export default function InventoryPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Inventory</h1>
           <p className="text-muted-foreground">
@@ -582,7 +582,7 @@ export default function InventoryPage() {
               : "Manage your product inventory"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {lastStockSync && (
             <span className="text-xs text-muted-foreground">
               Stock synced:{" "}
@@ -729,7 +729,7 @@ export default function InventoryPage() {
                 setCategoryFilter(e.target.value);
                 setPage(1);
               }}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[160px]"
+              className="h-9 rounded-md border border-input bg-background px-3 text-base sm:text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[140px] sm:min-w-[160px]"
             >
               <option value="">All Categories</option>
               <option value="__uncategorized">Uncategorized</option>
@@ -751,7 +751,7 @@ export default function InventoryPage() {
                 setVendorFilter(e.target.value);
                 setPage(1);
               }}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[160px]"
+              className="h-9 rounded-md border border-input bg-background px-3 text-base sm:text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[140px] sm:min-w-[160px]"
             >
               <option value="">All Vendors</option>
               {vendors.map((v: any) => (
@@ -772,7 +772,7 @@ export default function InventoryPage() {
                 setStockFilter(e.target.value);
                 setPage(1);
               }}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[130px]"
+              className="h-9 rounded-md border border-input bg-background px-3 text-base sm:text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[130px]"
             >
               <option value="">All Stock</option>
               <option value="low-stock">Low Stock</option>
@@ -827,6 +827,7 @@ export default function InventoryPage() {
             </div>
           ) : (
             <>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -916,6 +917,7 @@ export default function InventoryPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (

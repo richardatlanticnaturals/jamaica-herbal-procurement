@@ -602,7 +602,7 @@ export default function PODetailPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Vendor</p>
@@ -652,6 +652,7 @@ export default function PODetailPage() {
             </CardHeader>
             <CardContent className="space-y-4 p-0">
               {showAddItem && (
+              /* Add item search panel */
                 <div className="mx-6 mb-4 p-4 border rounded-md bg-muted/30">
                   <div className="relative mb-3">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -707,6 +708,7 @@ export default function PODetailPage() {
                 </div>
               )}
 
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -739,7 +741,7 @@ export default function PODetailPage() {
                           onChange={(e) =>
                             updateEditQty(index, parseInt(e.target.value) || 1)
                           }
-                          className="h-8 w-20"
+                          className="h-10 w-20 text-base sm:text-sm"
                         />
                       </TableCell>
                       <TableCell>
@@ -751,7 +753,7 @@ export default function PODetailPage() {
                           onChange={(e) =>
                             updateEditUnitCost(index, parseFloat(e.target.value) || 0)
                           }
-                          className="h-8 w-24"
+                          className="h-10 w-24 text-base sm:text-sm"
                         />
                       </TableCell>
                       <TableCell className="text-right font-medium">
@@ -762,7 +764,7 @@ export default function PODetailPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeEditItem(index)}
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          className="h-10 w-10 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -778,6 +780,7 @@ export default function PODetailPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
 
               <div className="border-t px-4 py-3 text-right">
                 <span className="text-sm text-muted-foreground mr-4">Subtotal:</span>
@@ -791,6 +794,7 @@ export default function PODetailPage() {
               <CardTitle>Line Items</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -843,6 +847,7 @@ export default function PODetailPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
 
               <div className="border-t px-4 py-3 text-right">
                 <span className="text-sm text-muted-foreground mr-4">Subtotal:</span>

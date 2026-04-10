@@ -288,14 +288,14 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Purchase Orders</h1>
           <p className="text-muted-foreground">
             {total > 0 ? `${total} purchase orders` : "Create and manage purchase orders"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             variant="outline"
             size="sm"
@@ -343,7 +343,7 @@ export default function PurchaseOrdersPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="h-9 rounded-md border border-input bg-background px-3 text-base sm:text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             {PO_STATUSES.map((s) => (
               <option key={s.value} value={s.value}>
@@ -360,7 +360,7 @@ export default function PurchaseOrdersPage() {
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="h-9 rounded-md border border-input bg-background px-3 text-base sm:text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           />
         </div>
 
@@ -371,7 +371,7 @@ export default function PurchaseOrdersPage() {
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="h-9 rounded-md border border-input bg-background px-3 text-base sm:text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           />
         </div>
 
@@ -427,6 +427,7 @@ export default function PurchaseOrdersPage() {
             </div>
           ) : (
             <>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -493,16 +494,18 @@ export default function PurchaseOrdersPage() {
                 </TableBody>
               </Table>
 
+              </div>
+
               {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t px-4 py-3">
                   <p className="text-sm text-muted-foreground">
                     Page {page} of {totalPages}
                   </p>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}>
+                    <Button variant="outline" size="sm" className="min-h-[44px] sm:min-h-0" onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}>
                       <ChevronLeft className="h-4 w-4" /> Previous
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>
+                    <Button variant="outline" size="sm" className="min-h-[44px] sm:min-h-0" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>
                       Next <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>

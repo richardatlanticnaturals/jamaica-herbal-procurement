@@ -370,7 +370,7 @@ export default function NewPurchaseOrderPage() {
                   setSearchResults([]);
                   setSearchQuery("");
                 }}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Choose a vendor...</option>
                 {vendors.map((vendor) => (
@@ -410,7 +410,7 @@ export default function NewPurchaseOrderPage() {
                 2
               </Badge>
               <h2 className="text-lg font-semibold">Add Items</h2>
-              <div className="ml-auto flex items-center gap-3">
+              <div className="ml-auto flex items-center gap-3 flex-wrap">
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
                   <input
                     type="checkbox"

@@ -35,7 +35,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#F8F7F4' }}>
+    <div className="flex min-h-screen items-center justify-center px-4" style={{ backgroundColor: '#F8F7F4' }}>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-2">
@@ -60,6 +60,7 @@ export default function LoginPage() {
                 type="email"
                 placeholder="jamaicanherbal@gmail.com"
                 required
+                className="text-base sm:text-sm"
               />
             </div>
             <div className="grid gap-2">
@@ -69,6 +70,7 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 required
+                className="text-base sm:text-sm"
               />
             </div>
             {error && (

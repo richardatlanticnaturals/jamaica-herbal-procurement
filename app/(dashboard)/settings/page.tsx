@@ -29,6 +29,7 @@ import {
   BarChart3,
   Zap,
   Store,
+  Download,
 } from "lucide-react";
 
 interface AppSettings {
@@ -52,6 +53,19 @@ interface AppSettings {
 interface SyncResult {
   success: boolean;
   message: string;
+}
+
+/* Shape of each item in the auto-tune preview array returned by the API */
+interface AutoTunePreviewItem {
+  itemId: string;
+  name: string;
+  sku: string;
+  currentReorderPoint: number;
+  suggestedReorderPoint: number;
+  avgDailySales: number;
+  leadTimeDays: number;
+  totalQtySold: number;
+  vendorName: string | null;
 }
 
 export default function SettingsPage() {
@@ -666,44 +680,101 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* Auto-Tune Section */}
-            <div className="pt-4 border-t space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium">Auto-Tune Reorder Points</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Calculate optimal reorder points based on 90-day sales velocity and vendor lead times (1.25x safety factor)
-                  </p>
-                </div>
-                <Button
-                  onClick={handleAutoTunePreview}
-                  disabled={autoTuning}
-                  size="sm"
-                  variant="outline"
-                >
-                  {autoTuning ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="mr-2 h-4 w-4" />
-                      Preview Changes
-                    </>
-                  )}
-                </Button>
-              </div>
+          </CardContent>
+        </Card>
 
-              {autoTuneResult && !autoTuneResult.error && (
-                <div className="rounded-md border p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      {autoTuneResult.itemsWithChanges} items would change
-                      <span className="text-muted-foreground font-normal ml-1">
-                        (of {autoTuneResult.totalItemsAnalyzed} analyzed)
-                      </span>
+        {/* --- Auto-Tune Reorder Points --- */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              <CardTitle>Auto-Tune Reorder Points</CardTitle>
+            </div>
+            <CardDescription>
+              Automatically calculate optimal reorder points based on 90-day
+              sales velocity &times; vendor lead time &times; 1.25 safety factor
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Preview button */}
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleAutoTunePreview}
+                disabled={autoTuning}
+                variant="outline"
+                size="sm"
+              >
+                {autoTuning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="mr-2 h-4 w-4" />
+                    Preview Changes
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Error state */}
+            {autoTuneResult?.error && (
+              <div className="rounded-md p-3 text-sm bg-red-50 text-red-700 border border-red-200">
+                <XCircle className="inline-block h-4 w-4 mr-2" />
+                {autoTuneResult.error}
+              </div>
+            )}
+
+            {/* Preview results */}
+            {autoTuneResult && !autoTuneResult.error && (
+              <div className="space-y-3">
+                {/* Summary row with action buttons */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-medium">
+                    {autoTuneResult.itemsWithChanges} items would be updated
+                    <span className="text-muted-foreground font-normal ml-1">
+                      (of {autoTuneResult.totalItemsAnalyzed} analyzed)
                     </span>
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    {/* Download CSV button -- always available when preview exists */}
+                    {autoTuneResult.preview && autoTuneResult.preview.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          /* Build CSV from preview data */
+                          const header = "Item Name,SKU,Current Reorder Point,Suggested Reorder Point,Avg Daily Sales,Vendor Lead Time (days),Vendor";
+                          const rows = (autoTuneResult.preview as AutoTunePreviewItem[]).map(
+                            (p) =>
+                              [
+                                `"${p.name.replace(/"/g, '""')}"`,
+                                p.sku,
+                                p.currentReorderPoint,
+                                p.suggestedReorderPoint,
+                                p.avgDailySales,
+                                p.leadTimeDays,
+                                `"${(p.vendorName || "").replace(/"/g, '""')}"`,
+                              ].join(",")
+                          );
+                          const csv = [header, ...rows].join("\n");
+                          const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `reorder-point-preview-${new Date().toISOString().slice(0, 10)}.csv`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download Preview CSV
+                      </Button>
+                    )}
+
+                    {/* Apply button -- only after preview, hidden once applied */}
                     {autoTuneResult.applied ? (
                       <Badge className="bg-green-100 text-green-700">
                         <CheckCircle className="mr-1 h-3 w-3" />
@@ -729,44 +800,50 @@ export default function SettingsPage() {
                       </Button>
                     )}
                   </div>
-                  {autoTuneResult.preview && autoTuneResult.preview.length > 0 && (
-                    <div className="max-h-48 overflow-y-auto text-xs">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="text-muted-foreground border-b">
-                            <th className="text-left py-1">Item</th>
-                            <th className="text-right py-1">Current</th>
-                            <th className="text-right py-1">Suggested</th>
-                            <th className="text-right py-1">Avg/Day</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {autoTuneResult.preview.slice(0, 20).map((p: any) => (
-                            <tr key={p.itemId} className="border-b border-muted/50">
-                              <td className="py-1 truncate max-w-[200px]">{p.name}</td>
-                              <td className="text-right py-1">{p.currentReorderPoint}</td>
-                              <td className="text-right py-1 font-medium">{p.suggestedReorderPoint}</td>
-                              <td className="text-right py-1">{p.avgDailySales}</td>
+                </div>
+
+                {/* Scrollable preview table with ALL columns */}
+                {autoTuneResult.preview && autoTuneResult.preview.length > 0 && (
+                  <div className="rounded-md border max-h-[400px] overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+                        <tr className="border-b">
+                          <th className="text-left px-3 py-2 font-medium">Item Name</th>
+                          <th className="text-left px-3 py-2 font-medium">SKU</th>
+                          <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Current RP</th>
+                          <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Suggested RP</th>
+                          <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Avg Daily Sales</th>
+                          <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Lead Time (days)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(autoTuneResult.preview as AutoTunePreviewItem[]).map((p) => {
+                          /* Color-code: green if suggested > current (increase), red if decrease */
+                          const isIncrease = p.suggestedReorderPoint > p.currentReorderPoint;
+                          const rowColor = isIncrease
+                            ? "bg-green-50 text-green-800"
+                            : "bg-red-50 text-red-800";
+                          return (
+                            <tr key={p.itemId} className={`border-b border-muted/50 ${rowColor}`}>
+                              <td className="px-3 py-1.5 max-w-[220px] truncate" title={p.name}>
+                                {p.name}
+                              </td>
+                              <td className="px-3 py-1.5 font-mono text-xs">{p.sku}</td>
+                              <td className="px-3 py-1.5 text-right">{p.currentReorderPoint}</td>
+                              <td className="px-3 py-1.5 text-right font-semibold">
+                                {p.suggestedReorderPoint}
+                              </td>
+                              <td className="px-3 py-1.5 text-right">{p.avgDailySales}</td>
+                              <td className="px-3 py-1.5 text-right">{p.leadTimeDays}</td>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {autoTuneResult.preview.length > 20 && (
-                        <p className="text-muted-foreground mt-1">
-                          ...and {autoTuneResult.preview.length - 20} more
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-              {autoTuneResult?.error && (
-                <div className="rounded-md p-3 text-sm bg-red-50 text-red-700 border border-red-200">
-                  <XCircle className="inline-block h-4 w-4 mr-2" />
-                  {autoTuneResult.error}
-                </div>
-              )}
-            </div>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

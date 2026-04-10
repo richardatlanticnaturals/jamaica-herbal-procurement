@@ -232,24 +232,24 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
             Overview of your procurement activity
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {lastStockSync && (
             <span className="text-xs text-muted-foreground">
               Stock synced: {timeAgo(lastStockSync)}
             </span>
           )}
-          <Button variant="outline" size="sm" onClick={handleRefreshStock} disabled={stockRefreshing}>
+          <Button variant="outline" size="sm" className="min-h-[44px] sm:min-h-0" onClick={handleRefreshStock} disabled={stockRefreshing}>
             <Database className={`mr-2 h-4 w-4 ${stockRefreshing ? "animate-spin" : ""}`} />
             {stockRefreshing ? "Syncing..." : "Refresh Stock"}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => fetchData()} disabled={loading}>
+          <Button variant="outline" size="sm" className="min-h-[44px] sm:min-h-0" onClick={() => fetchData()} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
@@ -497,7 +497,8 @@ export default function DashboardPage() {
                 No purchase orders yet. Import your inventory to get started.
               </div>
             ) : (
-              <Table>
+              <div className="overflow-x-auto">
+            <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>PO #</TableHead>
@@ -540,6 +541,7 @@ export default function DashboardPage() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
             )}
           </CardContent>
         </Card>

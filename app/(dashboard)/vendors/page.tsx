@@ -126,7 +126,7 @@ function InlineEditCell({
           onBlur={handleSave}
           onKeyDown={handleKeyDown}
           disabled={saving}
-          className="h-7 w-full min-w-[60px] rounded border border-primary bg-white px-2 text-sm outline-none focus:ring-1 focus:ring-primary"
+          className="h-9 w-full min-w-[60px] rounded border border-primary bg-white px-2 text-base sm:text-sm outline-none focus:ring-1 focus:ring-primary"
           placeholder={placeholder}
         />
       </div>
@@ -470,14 +470,14 @@ export default function VendorsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Vendors</h1>
           <p className="text-muted-foreground">
             Manage your product suppliers and ordering preferences
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* CSV Export */}
           <Button
             variant="outline"
@@ -649,6 +649,7 @@ export default function VendorsPage() {
       ) : (
         <Card>
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -766,6 +767,7 @@ export default function VendorsPage() {
                 No vendors matching &quot;{search}&quot;
               </div>
             )}
+            </div>
           </CardContent>
         </Card>
       )}

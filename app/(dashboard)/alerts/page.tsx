@@ -520,15 +520,15 @@ function OosItemCard({
   return (
     <div className="rounded-lg border bg-red-50/50 p-4 space-y-3">
       {/* Item Info */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-sm">{item.description}</span>
             <Badge variant="outline" className="text-xs">
               {item.inventoryItem?.sku}
             </Badge>
           </div>
-          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
             <span>PO: {item.purchaseOrder.poNumber}</span>
             {item.vendorSku && <span>Vendor SKU: {item.vendorSku}</span>}
             {item.inventoryItem?.category && (

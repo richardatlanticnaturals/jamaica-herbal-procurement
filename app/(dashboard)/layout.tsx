@@ -24,7 +24,7 @@ export default async function DashboardLayout({
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-3 sm:p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );
