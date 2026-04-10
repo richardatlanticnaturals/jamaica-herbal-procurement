@@ -106,53 +106,60 @@ export async function ocrDeliverySlip(
     };
   }
 
-  // Retry logic for transient API errors (429, 529, 500)
-  const maxRetries = 3;
+  // Try Sonnet first, fall back to Haiku if overloaded
+  const models = ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"];
+  const maxRetries = 2;
   let response: Response | null = null;
   let lastError = "";
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    if (attempt > 0) {
-      // Wait before retry: 2s, 4s
-      await new Promise((r) => setTimeout(r, 2000 * attempt));
-      console.log(`[OCR] Retry attempt ${attempt + 1}/${maxRetries}...`);
+  for (const model of models) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, 2000));
+        console.log(`[OCR] Retry ${model} attempt ${attempt + 1}...`);
+      }
+
+      response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          messages: [
+            {
+              role: "user",
+              content: [
+                contentBlock,
+                {
+                  type: "text",
+                  text: isPdf
+                    ? "Extract all delivery/invoice information from this PDF document. Return ONLY the JSON object, no markdown fences."
+                    : "Extract all delivery/invoice information from this image. Return ONLY the JSON object, no markdown fences.",
+                },
+              ],
+            },
+          ],
+          system: SYSTEM_PROMPT,
+        }),
+      });
+
+      if (response.ok) {
+        console.log(`[OCR] Success with ${model}`);
+        break;
+      }
+
+      lastError = await response.text();
+      console.error(`[OCR] ${model} error (attempt ${attempt + 1}):`, response.status);
+
+      if (response.status !== 429 && response.status !== 529 && response.status !== 500) break;
     }
 
-    response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        messages: [
-          {
-            role: "user",
-            content: [
-              contentBlock,
-              {
-                type: "text",
-                text: isPdf
-                  ? "Extract all delivery/invoice information from this PDF document. Return ONLY the JSON object, no markdown fences."
-                  : "Extract all delivery/invoice information from this image. Return ONLY the JSON object, no markdown fences.",
-              },
-            ],
-          },
-        ],
-        system: SYSTEM_PROMPT,
-      }),
-    });
-
-    if (response.ok) break;
-
-    lastError = await response.text();
-    console.error(`[OCR] Claude API error (attempt ${attempt + 1}):`, response.status, lastError);
-
-    // Only retry on overloaded/rate-limited errors
-    if (response.status !== 429 && response.status !== 529 && response.status !== 500) break;
+    if (response?.ok) break;
+    console.log(`[OCR] ${model} failed, trying next model...`);
   }
 
   if (!response || !response.ok) {
