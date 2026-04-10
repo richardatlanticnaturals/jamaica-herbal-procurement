@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAdmin } from "@/lib/api-auth";
 
 /**
  * GET /api/settings
  * Returns the current app settings along with env-based API key statuses.
+ * Admin only.
  */
 export async function GET() {
-  const authError = await requireAuth();
+  const authError = await requireAdmin();
   if (authError) return authError;
 
   try {
@@ -38,7 +39,7 @@ export async function GET() {
  * Updates writable app settings fields.
  */
 export async function PATCH(request: NextRequest) {
-  const authError = await requireAuth();
+  const authError = await requireAdmin();
   if (authError) return authError;
 
   try {

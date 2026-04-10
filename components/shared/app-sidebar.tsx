@@ -50,8 +50,8 @@ const navItems = [
   { title: "Alerts", href: "/alerts", icon: Bell },
   { title: "Reports", href: "/reports", icon: BarChart3 },
   { title: "AI Chat", href: "/chat", icon: Sparkles },
-  { title: "Settings", href: "/settings", icon: Settings },
-];
+  { title: "Settings", href: "/settings", icon: Settings, adminOnly: true },
+] as const;
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -78,7 +78,9 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {navItems
+                .filter((item) => !("adminOnly" in item && item.adminOnly) || session?.user?.email === "jamaicanherbal@gmail.com")
+                .map((item) => {
                 const isActive =
                   item.href === "/"
                     ? pathname === "/"
