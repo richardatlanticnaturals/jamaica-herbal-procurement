@@ -165,17 +165,40 @@ export async function POST(request: NextRequest) {
     const matchedItems: QuickMatchedItem[] = ocrResult.items.map((ocrItem) => {
       const scored: { inv: InventoryCandidate; confidence: number }[] = [];
 
+      // Extract any barcode-like numbers from OCR item (UPC/EAN are 8-14 digits)
+      const ocrBarcodes: string[] = [];
+      if (ocrItem.sku) ocrBarcodes.push(ocrItem.sku.replace(/\D/g, ""));
+      // Also check if the name contains a barcode (some invoices embed it)
+      const barcodeInName = ocrItem.name.match(/\b\d{8,14}\b/g);
+      if (barcodeInName) ocrBarcodes.push(...barcodeInName);
+
       for (const inv of allInventory) {
-        // Name similarity
+        // 1. EXACT barcode/SKU match (highest priority)
+        let skuSim = 0;
+        const invSkuClean = inv.sku.replace(/\D/g, "");
+        const invVendorSkuClean = (inv.vendorSku || "").replace(/\D/g, "");
+
+        for (const bc of ocrBarcodes) {
+          if (bc.length >= 8) {
+            if (bc === invSkuClean || invSkuClean.includes(bc) || bc.includes(invSkuClean)) { skuSim = 1.0; break; }
+            if (invVendorSkuClean && (bc === invVendorSkuClean || invVendorSkuClean.includes(bc))) { skuSim = 0.9; break; }
+          }
+        }
+        // Also try raw string match
+        if (skuSim < 0.8) {
+          const s1 = skuMatch(ocrItem.sku, inv.sku);
+          const s2 = skuMatch(ocrItem.sku, inv.vendorSku);
+          skuSim = Math.max(skuSim, s1, s2);
+        }
+
+        // 2. Name similarity
         const nameSim = similarity(ocrItem.name, inv.name);
 
-        // SKU match (check both sku and vendorSku)
-        const skuSim1 = skuMatch(ocrItem.sku, inv.sku);
-        const skuSim2 = skuMatch(ocrItem.sku, inv.vendorSku);
-        const skuSim = Math.max(skuSim1, skuSim2);
-
+        // Combined confidence — SKU match is king
         let confidence: number;
-        if (skuSim >= 0.8) {
+        if (skuSim >= 0.9) {
+          confidence = skuSim; // Perfect SKU match = high confidence regardless of name
+        } else if (skuSim >= 0.8) {
           confidence = Math.max(skuSim, 0.3 * nameSim + 0.7 * skuSim);
         } else {
           confidence = nameSim;

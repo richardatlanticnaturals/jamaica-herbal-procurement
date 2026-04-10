@@ -38,7 +38,8 @@ Rules:
 - Extract the vendor/supplier name from the header or letterhead
 - Extract the invoice/delivery number
 - Extract the date (convert to YYYY-MM-DD)
-- For each line item, extract the product name, quantity, unit price, and SKU/code
+- For each line item, extract the product name, quantity, unit price, and SKU/UPC/barcode
+- For the SKU field: prefer the UPC/EAN barcode (8-14 digit number) over internal vendor codes. If both are present, use the UPC barcode.
 - If a value is not visible or unclear, use null
 - Quantities must be positive integers; if unclear default to 1
 - Unit prices should be decimal numbers (e.g. 12.50)

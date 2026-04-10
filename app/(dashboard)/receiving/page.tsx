@@ -945,24 +945,27 @@ export default function ReceivingPage() {
                                       Stock: {item.selectedMatch.currentStock}
                                     </div>
                                     {/* Show alternative matches dropdown */}
-                                    {item.topMatches.length > 1 && (
-                                      <select
-                                        className="mt-1 text-xs border rounded px-1 py-0.5 bg-background"
-                                        value={item.selectedMatch.inventoryItemId}
-                                        onChange={(e) => {
-                                          const candidate = item.topMatches.find(
-                                            (c) => c.inventoryItemId === e.target.value
-                                          );
-                                          if (candidate) handleQuickSelectMatch(index, candidate);
-                                        }}
-                                      >
-                                        {item.topMatches.map((c) => (
-                                          <option key={c.inventoryItemId} value={c.inventoryItemId}>
-                                            {c.inventoryName} ({Math.round(c.confidence * 100)}%)
-                                          </option>
-                                        ))}
-                                      </select>
-                                    )}
+                                    <select
+                                      className="mt-1 text-xs border rounded px-2 py-1 bg-background w-full max-w-[300px]"
+                                      value={item.selectedMatch.inventoryItemId}
+                                      onChange={(e) => {
+                                        if (e.target.value === "__search__") {
+                                          setSearchingForIndex(index);
+                                          return;
+                                        }
+                                        const candidate = item.topMatches.find(
+                                          (c) => c.inventoryItemId === e.target.value
+                                        );
+                                        if (candidate) handleQuickSelectMatch(index, candidate);
+                                      }}
+                                    >
+                                      {item.topMatches.map((c) => (
+                                        <option key={c.inventoryItemId} value={c.inventoryItemId}>
+                                          {c.inventoryName} ({Math.round(c.confidence * 100)}%)
+                                        </option>
+                                      ))}
+                                      <option value="__search__">🔍 Search for correct item...</option>
+                                    </select>
                                   </div>
                                 ) : (
                                   <div className="text-muted-foreground italic">
