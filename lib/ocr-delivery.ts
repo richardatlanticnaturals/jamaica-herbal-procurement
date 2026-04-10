@@ -124,7 +124,7 @@ export async function ocrDeliverySlip(
         headers: {
           "Content-Type": "application/json",
           "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+          "anthropic-version": "2025-04-15",
         },
         body: JSON.stringify({
           model,
@@ -189,8 +189,19 @@ export async function ocrDeliverySlip(
   try {
     parsed = JSON.parse(jsonStr);
   } catch {
-    console.error("Failed to parse OCR JSON:", jsonStr);
-    throw new Error("Failed to parse OCR response as JSON");
+    // Try one more cleanup: remove any leading/trailing non-JSON characters
+    const cleanMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (cleanMatch) {
+      try {
+        parsed = JSON.parse(cleanMatch[0]);
+      } catch {
+        console.error("[OCR] Failed to parse OCR JSON after cleanup. Raw text:", rawText.substring(0, 500));
+        throw new Error("Failed to parse OCR response as JSON");
+      }
+    } else {
+      console.error("[OCR] No JSON object found in response. Raw text:", rawText.substring(0, 500));
+      throw new Error("Failed to parse OCR response as JSON");
+    }
   }
 
   // Validate and sanitize the result
