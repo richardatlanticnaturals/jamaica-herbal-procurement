@@ -128,7 +128,7 @@ export async function ocrDeliverySlip(
         },
         body: JSON.stringify({
           model,
-          max_tokens: 8192,
+          max_tokens: 16384,
           messages: [
             {
               role: "user",
