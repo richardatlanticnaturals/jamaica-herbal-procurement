@@ -28,7 +28,14 @@ import {
   PackageX,
   DollarSign,
   ArrowUpDown,
+  Sliders,
+  Play,
+  Loader2,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   BarChart,
   Bar,
@@ -209,6 +216,9 @@ export default function ReportsPage() {
             <TabsTrigger value="inventory-value" className="text-xs sm:text-sm">
               Inventory Value
             </TabsTrigger>
+            <TabsTrigger value="custom-report" className="text-xs sm:text-sm">
+              Custom Report
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -232,6 +242,9 @@ export default function ReportsPage() {
         </TabsContent>
         <TabsContent value="inventory-value">
           <InventoryValueTab />
+        </TabsContent>
+        <TabsContent value="custom-report">
+          <CustomReportTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -957,6 +970,684 @@ function InventoryValueTab() {
               </Table>
             </div>
           </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ===============================================
+// Tab: Custom Report Builder
+// ===============================================
+
+// Report type definitions with their available columns
+const REPORT_TYPES = [
+  { value: "sales-by-product", label: "Sales by Product", group: "sales" },
+  { value: "sales-by-category", label: "Sales by Category", group: "sales" },
+  { value: "sales-by-vendor", label: "Sales by Vendor", group: "sales" },
+  { value: "inventory-by-category", label: "Inventory by Category", group: "inventory" },
+  { value: "inventory-by-vendor", label: "Inventory by Vendor", group: "inventory" },
+  { value: "po-spend-by-vendor", label: "PO Spend by Vendor", group: "po" },
+  { value: "po-spend-by-month", label: "PO Spend by Month", group: "po" },
+  { value: "profit-analysis", label: "Profit Analysis", group: "sales" },
+] as const;
+
+// Map report type -> columns it can return
+const REPORT_COLUMNS: Record<string, { key: string; label: string; align?: "right" }[]> = {
+  "sales-by-product": [
+    { key: "productName", label: "Product Name" },
+    { key: "sku", label: "SKU" },
+    { key: "category", label: "Category" },
+    { key: "vendor", label: "Vendor" },
+    { key: "currentStock", label: "Stock", align: "right" },
+    { key: "costPrice", label: "Cost", align: "right" },
+    { key: "retailPrice", label: "Retail", align: "right" },
+    { key: "marginPercent", label: "Margin %", align: "right" },
+    { key: "qtySold", label: "Qty Sold", align: "right" },
+    { key: "revenue", label: "Revenue", align: "right" },
+    { key: "reorderPoint", label: "Reorder Point", align: "right" },
+  ],
+  "sales-by-category": [
+    { key: "category", label: "Category" },
+    { key: "productCount", label: "Products", align: "right" },
+    { key: "qtySold", label: "Qty Sold", align: "right" },
+    { key: "revenue", label: "Revenue", align: "right" },
+  ],
+  "sales-by-vendor": [
+    { key: "vendor", label: "Vendor" },
+    { key: "productCount", label: "Products", align: "right" },
+    { key: "qtySold", label: "Qty Sold", align: "right" },
+    { key: "revenue", label: "Revenue", align: "right" },
+  ],
+  "inventory-by-category": [
+    { key: "category", label: "Category" },
+    { key: "productCount", label: "Products", align: "right" },
+    { key: "totalStock", label: "Total Stock", align: "right" },
+    { key: "costValue", label: "Cost Value", align: "right" },
+    { key: "retailValue", label: "Retail Value", align: "right" },
+    { key: "lowStockCount", label: "Low Stock", align: "right" },
+    { key: "outOfStockCount", label: "Out of Stock", align: "right" },
+  ],
+  "inventory-by-vendor": [
+    { key: "vendor", label: "Vendor" },
+    { key: "productCount", label: "Products", align: "right" },
+    { key: "totalStock", label: "Total Stock", align: "right" },
+    { key: "costValue", label: "Cost Value", align: "right" },
+    { key: "retailValue", label: "Retail Value", align: "right" },
+    { key: "lowStockCount", label: "Low Stock", align: "right" },
+    { key: "outOfStockCount", label: "Out of Stock", align: "right" },
+  ],
+  "po-spend-by-vendor": [
+    { key: "vendor", label: "Vendor" },
+    { key: "poCount", label: "PO Count", align: "right" },
+    { key: "totalSpend", label: "Total Spend", align: "right" },
+    { key: "totalItems", label: "Total Items", align: "right" },
+    { key: "avgPoValue", label: "Avg PO Value", align: "right" },
+  ],
+  "po-spend-by-month": [
+    { key: "month", label: "Month" },
+    { key: "poCount", label: "PO Count", align: "right" },
+    { key: "totalSpend", label: "Total Spend", align: "right" },
+  ],
+  "profit-analysis": [
+    { key: "productName", label: "Product Name" },
+    { key: "sku", label: "SKU" },
+    { key: "category", label: "Category" },
+    { key: "vendor", label: "Vendor" },
+    { key: "costPrice", label: "Cost", align: "right" },
+    { key: "retailPrice", label: "Retail", align: "right" },
+    { key: "marginPercent", label: "Margin %", align: "right" },
+    { key: "qtySold", label: "Qty Sold", align: "right" },
+    { key: "revenue", label: "Revenue", align: "right" },
+    { key: "totalCost", label: "Total Cost", align: "right" },
+    { key: "profit", label: "Profit", align: "right" },
+    { key: "currentStock", label: "Stock", align: "right" },
+    { key: "reorderPoint", label: "Reorder Point", align: "right" },
+  ],
+};
+
+// Currency columns for formatting
+const CURRENCY_COLUMNS = new Set([
+  "costPrice", "retailPrice", "revenue", "costValue", "retailValue",
+  "totalSpend", "avgPoValue", "totalCost", "profit",
+]);
+
+// Percent columns
+const PERCENT_COLUMNS = new Set(["marginPercent"]);
+
+function CustomReportTab() {
+  // -- State --
+  const [reportType, setReportType] = useState("sales-by-product");
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split("T")[0];
+  });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split("T")[0]);
+
+  // Filters
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [vendorFilter, setVendorFilter] = useState<string[]>([]);
+  const [stockStatus, setStockStatus] = useState("all");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [minMargin, setMinMargin] = useState("");
+  const [maxMargin, setMaxMargin] = useState("");
+
+  // Columns
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
+
+  // Sort
+  const [customSortBy, setCustomSortBy] = useState("");
+  const [customSortDir, setCustomSortDir] = useState<"asc" | "desc">("desc");
+
+  // Results
+  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [total, setTotal] = useState(0);
+  const [customLoading, setCustomLoading] = useState(false);
+  const [hasRun, setHasRun] = useState(false);
+
+  // Lookup data for filter dropdowns
+  const [categories, setCategories] = useState<string[]>([]);
+  const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
+
+  // Show/hide filters panel
+  const [showFilters, setShowFilters] = useState(true);
+
+  // Available columns for current report type
+  const availableColumns = REPORT_COLUMNS[reportType] || [];
+
+  // Load filter options on mount
+  useEffect(() => {
+    async function loadFilterOptions() {
+      try {
+        const [catRes, vendorRes] = await Promise.all([
+          fetch("/api/reports?type=category-summary"),
+          fetch("/api/reports?type=vendor-summary"),
+        ]);
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          setCategories(catData.data.map((c: { category: string }) => c.category));
+        }
+        if (vendorRes.ok) {
+          const vendorData = await vendorRes.json();
+          setVendors(vendorData.data.map((v: { id: string; name: string }) => ({ id: v.id, name: v.name })));
+        }
+      } catch {
+        // Filter options are optional
+      }
+    }
+    loadFilterOptions();
+  }, []);
+
+  // When report type changes, reset columns and select all by default
+  useEffect(() => {
+    const cols = REPORT_COLUMNS[reportType] || [];
+    setSelectedColumns(cols.map((c) => c.key));
+    setCustomSortBy("");
+    setHasRun(false);
+    setRows([]);
+  }, [reportType]);
+
+  // Toggle a column
+  const toggleColumn = (key: string) => {
+    setSelectedColumns((prev) =>
+      prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key]
+    );
+  };
+
+  // Select / deselect all columns
+  const toggleAllColumns = () => {
+    if (selectedColumns.length === availableColumns.length) {
+      setSelectedColumns([]);
+    } else {
+      setSelectedColumns(availableColumns.map((c) => c.key));
+    }
+  };
+
+  // Run report
+  const runReport = useCallback(async () => {
+    setCustomLoading(true);
+    setHasRun(true);
+    try {
+      const body: Record<string, unknown> = {
+        reportType,
+        dateFrom,
+        dateTo,
+        columns: selectedColumns,
+        sortBy: customSortBy || undefined,
+        sortDir: customSortDir,
+        limit: 500,
+        filters: {
+          ...(categoryFilter.length ? { categories: categoryFilter } : {}),
+          ...(vendorFilter.length ? { vendors: vendorFilter } : {}),
+          ...(stockStatus !== "all" ? { stockStatus } : {}),
+          ...(minPrice ? { minPrice: parseFloat(minPrice) } : {}),
+          ...(maxPrice ? { maxPrice: parseFloat(maxPrice) } : {}),
+          ...(minMargin ? { minMargin: parseFloat(minMargin) } : {}),
+          ...(maxMargin ? { maxMargin: parseFloat(maxMargin) } : {}),
+        },
+      };
+
+      const res = await fetch("/api/reports/custom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to fetch report");
+      }
+
+      const data = await res.json();
+      setRows(data.rows || []);
+      setTotal(data.total || 0);
+    } catch (err) {
+      console.error("Custom report error:", err);
+      setRows([]);
+      setTotal(0);
+    } finally {
+      setCustomLoading(false);
+    }
+  }, [reportType, dateFrom, dateTo, selectedColumns, customSortBy, customSortDir, categoryFilter, vendorFilter, stockStatus, minPrice, maxPrice, minMargin, maxMargin]);
+
+  // Export CSV
+  const exportCSV = () => {
+    if (!rows.length) return;
+    const colMap = Object.fromEntries(availableColumns.map((c) => [c.key, c.label]));
+    const exportRows = rows.map((row) => {
+      const out: Record<string, unknown> = {};
+      for (const key of selectedColumns) {
+        out[colMap[key] || key] = row[key];
+      }
+      return out;
+    });
+    downloadCSV(exportRows, `custom-report-${reportType}-${new Date().toISOString().split("T")[0]}.csv`);
+  };
+
+  // Format cell value
+  const formatCellValue = (key: string, value: unknown): string => {
+    if (value === null || value === undefined) return "-";
+    if (CURRENCY_COLUMNS.has(key)) return formatCurrency(Number(value));
+    if (PERCENT_COLUMNS.has(key)) return `${Number(value).toFixed(1)}%`;
+    return String(value);
+  };
+
+  // Check which filter groups apply to current report type
+  const reportGroup = REPORT_TYPES.find((r) => r.value === reportType)?.group || "sales";
+  const showDateFilters = reportGroup === "sales" || reportGroup === "po";
+  const showCategoryFilter = reportGroup === "sales" || reportGroup === "inventory";
+  const showVendorFilter = true;
+  const showStockFilter = reportGroup === "inventory";
+  const showPriceFilter = reportGroup === "inventory" || reportType === "sales-by-product" || reportType === "profit-analysis";
+  const showMarginFilter = reportType === "profit-analysis" || reportType === "sales-by-product";
+
+  // Header sort click
+  const handleHeaderSort = (key: string) => {
+    if (customSortBy === key) {
+      setCustomSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setCustomSortBy(key);
+      setCustomSortDir("desc");
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sliders className="h-5 w-5 text-[#FFB81C]" />
+            <CardTitle className="text-lg">Custom Report Builder</CardTitle>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {showFilters && (
+          <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
+            {/* Row 1: Report Type + Date Range */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Report Type */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Report Type</Label>
+                <Select value={reportType} onValueChange={(val) => { if (val) setReportType(val); }}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REPORT_TYPES.map((rt) => (
+                      <SelectItem key={rt.value} value={rt.value}>
+                        {rt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date From */}
+              {showDateFilters && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Date From</Label>
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {/* Date To */}
+              {showDateFilters && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Date To</Label>
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Row 2: Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Category filter */}
+              {showCategoryFilter && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Category</Label>
+                  <Select
+                    value={categoryFilter.length === 1 ? categoryFilter[0] : "all"}
+                    onValueChange={(val) =>
+                      setCategoryFilter(!val || val === "all" ? [] : [val])
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Vendor filter */}
+              {showVendorFilter && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Vendor</Label>
+                  <Select
+                    value={vendorFilter.length === 1 ? vendorFilter[0] : "all"}
+                    onValueChange={(val) =>
+                      setVendorFilter(!val || val === "all" ? [] : [val])
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Vendors" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Vendors</SelectItem>
+                      {vendors.map((v) => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {v.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Stock Status filter */}
+              {showStockFilter && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Stock Status</Label>
+                  <Select value={stockStatus} onValueChange={(val) => { if (val) setStockStatus(val); }}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="in-stock">In Stock</SelectItem>
+                      <SelectItem value="low-stock">Low Stock</SelectItem>
+                      <SelectItem value="out-of-stock">Out of Stock</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Sort By */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Sort By</Label>
+                <div className="flex gap-1">
+                  <Select
+                    value={customSortBy || "default"}
+                    onValueChange={(val) => setCustomSortBy(!val || val === "default" ? "" : val)}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Default" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">Default</SelectItem>
+                      {availableColumns.map((col) => (
+                        <SelectItem key={col.key} value={col.key}>
+                          {col.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => setCustomSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                    title={customSortDir === "asc" ? "Ascending" : "Descending"}
+                  >
+                    {customSortDir === "asc" ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 3: Min/Max filters */}
+            {(showPriceFilter || showMarginFilter) && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {showPriceFilter && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Min Price ($)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={minPrice}
+                        onChange={(e) => setMinPrice(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Max Price ($)</Label>
+                      <Input
+                        type="number"
+                        placeholder="999"
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+                {showMarginFilter && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Min Margin (%)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={minMargin}
+                        onChange={(e) => setMinMargin(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Max Margin (%)</Label>
+                      <Input
+                        type="number"
+                        placeholder="100"
+                        value={maxMargin}
+                        onChange={(e) => setMaxMargin(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Row 4: Column selector */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium">Columns</Label>
+                <button
+                  type="button"
+                  className="text-xs text-[#009B3A] hover:underline"
+                  onClick={toggleAllColumns}
+                >
+                  {selectedColumns.length === availableColumns.length
+                    ? "Deselect All"
+                    : "Select All"}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {availableColumns.map((col) => {
+                  const isSelected = selectedColumns.includes(col.key);
+                  return (
+                    <button
+                      key={col.key}
+                      type="button"
+                      onClick={() => toggleColumn(col.key)}
+                      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                        isSelected
+                          ? "border-[#009B3A] bg-[#009B3A]/10 text-[#009B3A]"
+                          : "border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground"
+                      }`}
+                    >
+                      {col.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Run Report button */}
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={runReport}
+                disabled={customLoading || selectedColumns.length === 0}
+                className="bg-[#009B3A] hover:bg-[#009B3A]/90 text-white"
+              >
+                {customLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="mr-2 h-4 w-4" />
+                )}
+                Run Report
+              </Button>
+              {hasRun && rows.length > 0 && (
+                <Button variant="outline" size="sm" onClick={exportCSV}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export CSV
+                </Button>
+              )}
+              {hasRun && (
+                <span className="text-xs text-muted-foreground">
+                  {total} result{total !== 1 ? "s" : ""}
+                  {rows.length < total ? ` (showing ${rows.length})` : ""}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Results Table */}
+        {customLoading && (
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            Generating report...
+          </div>
+        )}
+
+        {!customLoading && hasRun && rows.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            No data found for the selected criteria. Try adjusting your filters or date range.
+          </div>
+        )}
+
+        {!customLoading && rows.length > 0 && (
+          <div className="rounded-md border overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {selectedColumns.map((key) => {
+                    const col = availableColumns.find((c) => c.key === key);
+                    if (!col) return null;
+                    const isSorted = customSortBy === key;
+                    return (
+                      <TableHead
+                        key={key}
+                        className={`cursor-pointer hover:bg-muted/50 select-none whitespace-nowrap ${
+                          col.align === "right" ? "text-right" : ""
+                        }`}
+                        onClick={() => handleHeaderSort(key)}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {col.label}
+                          {isSorted ? (
+                            customSortDir === "asc" ? (
+                              <ChevronUp className="h-3 w-3" />
+                            ) : (
+                              <ChevronDown className="h-3 w-3" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 opacity-30" />
+                          )}
+                        </span>
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row, idx) => (
+                  <TableRow key={idx}>
+                    {selectedColumns.map((key) => {
+                      const col = availableColumns.find((c) => c.key === key);
+                      return (
+                        <TableCell
+                          key={key}
+                          className={`whitespace-nowrap ${
+                            col?.align === "right" ? "text-right" : ""
+                          } ${
+                            key === "profit"
+                              ? Number(row[key]) >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                              : ""
+                          } ${
+                            key === "marginPercent"
+                              ? Number(row[key]) < 20
+                                ? "text-red-600"
+                                : Number(row[key]) > 50
+                                  ? "text-green-600"
+                                  : ""
+                              : ""
+                          }`}
+                        >
+                          {formatCellValue(key, row[key])}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* Collapsed state: quick actions */}
+        {!showFilters && hasRun && rows.length > 0 && (
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={runReport}
+              disabled={customLoading}
+              size="sm"
+              className="bg-[#009B3A] hover:bg-[#009B3A]/90 text-white"
+            >
+              {customLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
+              Re-run
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportCSV}>
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {total} result{total !== 1 ? "s" : ""}
+            </span>
+          </div>
         )}
       </CardContent>
     </Card>
