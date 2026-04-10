@@ -179,9 +179,10 @@ export async function POST(request: NextRequest) {
         const invVendorSkuClean = (inv.vendorSku || "").replace(/\D/g, "");
 
         for (const bc of ocrBarcodes) {
-          if (bc.length >= 8) {
-            if (bc === invSkuClean || invSkuClean.includes(bc) || bc.includes(invSkuClean)) { skuSim = 1.0; break; }
-            if (invVendorSkuClean && (bc === invVendorSkuClean || invVendorSkuClean.includes(bc))) { skuSim = 0.9; break; }
+          if (bc.length >= 8 && invSkuClean.length >= 8) {
+            // Exact match only — no partial includes (causes false positives)
+            if (bc === invSkuClean) { skuSim = 1.0; break; }
+            if (invVendorSkuClean.length >= 8 && bc === invVendorSkuClean) { skuSim = 0.9; break; }
           }
         }
         // Also try raw string match
