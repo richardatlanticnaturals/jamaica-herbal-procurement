@@ -376,13 +376,13 @@ const tools: Anthropic.Tool[] = [
   {
     name: "auto_tune_reorder_points",
     description:
-      "Calculate optimal reorder points based on sales velocity over the last 4 months. Uses formula: ceil(avgDailySales * leadTimeDays * safetyFactor). Returns a preview of suggested changes. If dryRun is false, applies the changes. Always do a dry run first and show the user what will change before applying.",
+      "Calculate optimal reorder points based on sales velocity over the last 90 days. Uses formula: ceil(avgDailySales * leadTimeDays * safetyFactor). Default safetyFactor is 1.25 (lean). Returns a preview of suggested changes. If dryRun is false, applies the changes. Always do a dry run first and show the user what will change before applying.",
     input_schema: {
       type: "object" as const,
       properties: {
-        safetyFactor: { type: "number", description: "Safety stock multiplier (default 1.5)" },
+        safetyFactor: { type: "number", description: "Safety stock multiplier (default 1.25)" },
         minReorderPoint: { type: "number", description: "Minimum reorder point floor (default 2)" },
-        periodDays: { type: "number", description: "Number of days of sales history to analyze (default 120)" },
+        periodDays: { type: "number", description: "Number of days of sales history to analyze (default 90)" },
         dryRun: { type: "boolean", description: "If true (default), only preview changes without applying. Set to false to apply after user confirms." },
       },
       required: [],
@@ -1127,7 +1127,7 @@ async function handleCreateSmartPO(
     });
   }
 
-  // Fetch sales velocity data for qty calculation: qtySoldLast4Months + 2, minimum 2
+  // Fetch sales velocity data for qty calculation: Math.max(1, qtySoldLast4Months)
   const orderSkus = itemsToOrder.map((i) => i.sku).filter(Boolean);
   const fourMonthsAgoPO = new Date();
   fourMonthsAgoPO.setMonth(fourMonthsAgoPO.getMonth() - 4);
@@ -1138,7 +1138,7 @@ async function handleCreateSmartPO(
   const velocityMap = new Map<string, number>(velocityData.map((s) => [s.sku, s.totalQtySold]));
 
   if (dryRun) {
-    // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
+    // Order qty based on sales velocity: Math.max(1, qtySoldLast4Months)
     const subtotal = itemsToOrder.reduce(
       (sum, i) => sum + Math.max(1, velocityMap.get(i.sku) || 0) * Number(i.costPrice), 0
     );
@@ -1170,7 +1170,7 @@ async function handleCreateSmartPO(
 
     const poNumber = `${settings.poNumberPrefix}-${new Date().getFullYear()}-${String(settings.nextPoSequence).padStart(4, "0")}`;
 
-    // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
+    // Order qty based on sales velocity: Math.max(1, qtySoldLast4Months)
     const lineItems = itemsToOrder.map((item) => {
       const qtyOrdered = Math.max(1, velocityMap.get(item.sku) || 0);
       return {
@@ -1316,7 +1316,7 @@ async function handleAutoGeneratePOs(input: Record<string, unknown> = {}): Promi
       const poNumber = `${settings.poNumberPrefix}-${year}-${String(nextSeq).padStart(4, "0")}`;
       nextSeq++;
 
-      // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
+      // Order qty based on sales velocity: Math.max(1, qtySoldLast4Months)
       const lineItems = activeItems.map((item) => {
         const qtyOrdered = Math.max(1, autoSalesMap.get(item.sku) || 0);
         return {
@@ -2219,9 +2219,10 @@ async function handleBulkUpdateInventory(
 async function handleAutoTuneReorderPoints(
   input: Record<string, unknown>
 ): Promise<string> {
-  const safetyFactor = (input.safetyFactor as number) || 1.5;
+  // Match API route defaults: 90 days, 1.25 safety factor
+  const safetyFactor = (input.safetyFactor as number) || 1.25;
   const minReorderPoint = (input.minReorderPoint as number) || 2;
-  const periodDays = (input.periodDays as number) || 120;
+  const periodDays = (input.periodDays as number) || 90;
   const dryRun = input.dryRun !== false; // default true
 
   const periodStart = new Date();

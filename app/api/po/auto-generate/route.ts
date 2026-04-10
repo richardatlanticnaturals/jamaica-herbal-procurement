@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         const activeItems = items.filter((item) => (salesMap.get(item.sku) || 0) > 0);
         if (activeItems.length === 0) continue; // Skip vendor if all items are slow movers
 
-        // Order qty based on sales velocity: qtySoldLast4Months + 2, minimum 2
+        // Order qty based on sales velocity: Math.max(1, qtySoldLast4Months)
         const lineItems = activeItems.map((item) => {
           const qtyOrdered = Math.max(1, salesMap.get(item.sku) || 0);
           return {

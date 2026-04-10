@@ -46,9 +46,12 @@ export async function PATCH(
     const body = await request.json();
 
     const data: Record<string, unknown> = {};
+    if (body.currentStock !== undefined) data.currentStock = Number(body.currentStock);
     if (body.category !== undefined) data.category = body.category || null;
     if (body.reorderPoint !== undefined) data.reorderPoint = Number(body.reorderPoint);
     if (body.reorderQty !== undefined) data.reorderQty = Number(body.reorderQty);
+    if (body.costPrice !== undefined) data.costPrice = Number(body.costPrice);
+    if (body.retailPrice !== undefined) data.retailPrice = Number(body.retailPrice);
     if (body.vendorId !== undefined) data.vendorId = body.vendorId || null;
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
 

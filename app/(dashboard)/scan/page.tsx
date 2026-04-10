@@ -81,6 +81,9 @@ export default function ScanPage() {
   const [newStock, setNewStock] = useState("");
   const [savingStock, setSavingStock] = useState(false);
 
+  // Ref to always call the latest handleBarcodeScan without stale closures
+  const handleBarcodeScanRef = useRef<(code: string) => void>(() => {});
+
   // Initialize scanner
   const startScanner = useCallback(async () => {
     if (!scannerRef.current || html5QrCodeRef.current) return;
@@ -100,8 +103,8 @@ export default function ScanPage() {
           aspectRatio: 1.0,
         },
         (decodedText: string) => {
-          // On successful scan
-          handleBarcodeScan(decodedText);
+          // Use ref to avoid stale closure over barcode/product state
+          handleBarcodeScanRef.current(decodedText);
         },
         () => {
           // QR code scan error (expected while scanning -- ignore)
@@ -158,6 +161,7 @@ export default function ScanPage() {
   }, []);
 
   // Handle barcode scan result
+  // Keep ref updated so scanner callback always calls latest version
   const handleBarcodeScan = async (code: string) => {
     // Prevent duplicate lookups
     if (code === barcode && product) return;
@@ -194,6 +198,9 @@ export default function ScanPage() {
       setLoading(false);
     }
   };
+
+  // Keep ref updated so scanner callback always uses latest closure
+  handleBarcodeScanRef.current = handleBarcodeScan;
 
   // Manual barcode entry
   const handleManualLookup = () => {

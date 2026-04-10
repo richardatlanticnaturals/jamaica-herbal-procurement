@@ -230,6 +230,7 @@ export default function InventoryPage() {
   const [vendors, setVendors] = useState<any[]>([]);
 
   // Edit form fields
+  const [editCurrentStock, setEditCurrentStock] = useState(0);
   const [editReorderPoint, setEditReorderPoint] = useState(0);
   const [editReorderQty, setEditReorderQty] = useState(0);
   const [editCostPrice, setEditCostPrice] = useState("");
@@ -524,6 +525,7 @@ export default function InventoryPage() {
 
   const openEditDialog = (item: any) => {
     setEditItem(item);
+    setEditCurrentStock(item.currentStock);
     setEditReorderPoint(item.reorderPoint);
     setEditReorderQty(item.reorderQty);
     setEditCostPrice(Number(item.costPrice).toFixed(2));
@@ -542,6 +544,7 @@ export default function InventoryPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          currentStock: editCurrentStock,
           reorderPoint: editReorderPoint,
           reorderQty: editReorderQty,
           costPrice: parseFloat(editCostPrice),
@@ -962,6 +965,17 @@ export default function InventoryPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-currentStock">Current Stock</Label>
+              <Input
+                id="edit-currentStock"
+                type="number"
+                min={0}
+                value={editCurrentStock}
+                onChange={(e) => setEditCurrentStock(Number(e.target.value))}
+                className="text-base sm:text-sm"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="edit-reorderPoint">Reorder Point</Label>

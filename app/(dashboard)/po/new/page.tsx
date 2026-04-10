@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,7 +77,7 @@ export default function NewPurchaseOrderPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<InventoryItem[]>([]);
   const [searching, setSearching] = useState(false);
-  const [searchTimer, setSearchTimer] = useState<NodeJS.Timeout | null>(null);
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // PO line items
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -134,10 +134,16 @@ export default function NewPurchaseOrderPage() {
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
-    if (searchTimer) clearTimeout(searchTimer);
-    const timer = setTimeout(() => searchItems(value), 300);
-    setSearchTimer(timer);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => searchItems(value), 300);
   };
+
+  // Cleanup search timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
 
   // --- Add item to PO (fetches sales velocity for qty) ---
   const addItem = async (item: InventoryItem) => {

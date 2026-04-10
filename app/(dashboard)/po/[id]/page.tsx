@@ -256,7 +256,7 @@ export default function PODetailPage() {
   const [itemSearch, setItemSearch] = useState("");
   const [itemSearchResults, setItemSearchResults] = useState<any[]>([]);
   const [itemSearching, setItemSearching] = useState(false);
-  const [searchTimer, setSearchTimer] = useState<NodeJS.Timeout | null>(null);
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Chat panel state
   const [chatOpen, setChatOpen] = useState(false);
@@ -346,10 +346,16 @@ export default function PODetailPage() {
 
   const handleItemSearchChange = (value: string) => {
     setItemSearch(value);
-    if (searchTimer) clearTimeout(searchTimer);
-    const timer = setTimeout(() => doItemSearch(value), 300);
-    setSearchTimer(timer);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => doItemSearch(value), 300);
   };
+
+  // Cleanup search timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
 
   const addItemToEdit = async (item: any) => {
     if (editLineItems.some((li) => li.inventoryItemId === item.id)) return;

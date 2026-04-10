@@ -197,6 +197,11 @@ export default function ReceivingPage() {
     setResult(null);
     setConfirmed(false);
 
+    // Revoke previous object URL to avoid memory leak
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
     // Preview
     const previewUrl = URL.createObjectURL(file);
     setImagePreview(previewUrl);
@@ -300,6 +305,8 @@ export default function ReceivingPage() {
   // Reset for new delivery
   const handleReset = () => {
     setSelectedPOId("");
+    // Revoke object URL to avoid memory leak
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
     setImageBase64(null);
     setResult(null);
