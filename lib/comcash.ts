@@ -403,26 +403,40 @@ export async function updateInventory(
   const errors: string[] = [];
   let updated = 0;
 
-  // Process in batches of 25 to avoid overloading the API
+  // Process in batches of 25 — Comcash expects { note, products: [...] } format
   const batchSize = 25;
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
+    const products = batch.map((item) => ({
+      productId: item.productId,
+      warehouseId: item.warehouseId || 2,
+      measureUnitId: item.measureUnitId || 1,
+      quantity: item.quantity,
+    }));
 
-    for (const item of batch) {
-      try {
-        await employeeApiRequest("/employee/warehouse/changeQuantity", {
-          productId: item.productId,
-          warehouseId: item.warehouseId || 2, // Default warehouse (2 = main stock warehouse)
-          measureUnitId: item.measureUnitId || 1, // Use product-specific measureUnitId (1=Each default)
-          quantity: item.quantity,
-        });
-        updated++;
-      } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : "Unknown error";
-        errors.push(
-          `Product ${item.productId}: ${msg}`
-        );
+    try {
+      await employeeApiRequest("/employee/warehouse/changeQuantity", {
+        note: `Sync from Jamaica Herbal app`,
+        products,
+      });
+      updated += batch.length;
+    } catch (err) {
+      // Batch failed — try items individually to find which ones fail
+      for (const item of batch) {
+        try {
+          await employeeApiRequest("/employee/warehouse/changeQuantity", {
+            note: "Sync from Jamaica Herbal app",
+            products: [{
+              productId: item.productId,
+              warehouseId: item.warehouseId || 2,
+              measureUnitId: item.measureUnitId || 1,
+              quantity: item.quantity,
+            }],
+          });
+          updated++;
+        } catch (itemErr) {
+          errors.push(`Product ${item.productId}: ${itemErr instanceof Error ? itemErr.message : "Unknown error"}`);
+        }
       }
     }
   }
