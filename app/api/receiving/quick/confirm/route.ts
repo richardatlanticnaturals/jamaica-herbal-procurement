@@ -167,11 +167,8 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    // Push received quantities (deltas) to Comcash (non-blocking)
-    // IMPORTANT: Comcash warehouse/changeQuantity expects a DELTA, NOT absolute stock.
-    // For receiving, the delta is the qtyReceived for each item.
+    // Push received quantities (deltas) to Comcash — MUST await (fire-and-forget gets killed on Vercel)
     if (updatedItemIds.length > 0) {
-      // Build a map of inventoryItemId -> qtyReceived (the delta to push)
       const deltaMap = new Map<string, number>();
       for (const item of items) {
         if (item.qtyReceived > 0) {
@@ -179,34 +176,29 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      prisma.inventoryItem
-        .findMany({
-          where: {
-            id: { in: updatedItemIds },
-            comcashItemId: { not: null },
-          },
+      try {
+        const comcashItems = await prisma.inventoryItem.findMany({
+          where: { id: { in: updatedItemIds }, comcashItemId: { not: null } },
           select: { id: true, comcashItemId: true, comcashMeasureUnitId: true },
-        })
-        .then((comcashItems) => {
-          if (comcashItems.length === 0) return;
+        });
+
+        if (comcashItems.length > 0) {
           const payload = comcashItems.map((item) => ({
             productId: parseInt(item.comcashItemId!, 10),
             warehouseId: 2,
-            measureUnitId: item.comcashMeasureUnitId || 1, // Use product-specific measureUnitId from DB
-            quantity: deltaMap.get(item.id) || 0, // Delta: qty received (positive = add stock)
+            measureUnitId: item.comcashMeasureUnitId || 1,
+            quantity: deltaMap.get(item.id) || 0,
           }));
-          return updateInventory(payload);
-        })
-        .then((comcashResult) => {
-          if (comcashResult && comcashResult.errors.length > 0) {
+          const comcashResult = await updateInventory(payload);
+          if (comcashResult.errors.length > 0) {
             console.warn("[Quick Receive] Comcash sync errors:", comcashResult.errors);
-          } else if (comcashResult) {
+          } else {
             console.log(`[Quick Receive] Comcash sync: ${comcashResult.updated} items pushed (deltas)`);
           }
-        })
-        .catch((err) => {
-          console.error("[Quick Receive] Comcash sync error:", err);
-        });
+        }
+      } catch (err) {
+        console.error("[Quick Receive] Comcash sync error:", err);
+      }
     }
 
     return NextResponse.json({

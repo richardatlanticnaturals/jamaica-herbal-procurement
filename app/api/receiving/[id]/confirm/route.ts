@@ -348,23 +348,17 @@ export async function POST(
             quantity: deltaMap.get(item.id) || 0, // Delta: qty received (positive = add stock)
           }));
 
-          // Fire and forget — don't await so we don't block the response
-          updateInventory(comcashPayload)
-            .then((comcashResult) => {
-              if (comcashResult.errors.length > 0) {
-                console.warn(
-                  "Comcash sync: some items failed:",
-                  comcashResult.errors
-                );
-              } else {
-                console.log(
-                  `Comcash sync: ${comcashResult.updated} items pushed successfully (deltas)`
-                );
-              }
-            })
-            .catch((err) => {
-              console.error("Comcash inventory push error:", err);
-            });
+          // MUST await — fire-and-forget gets killed on Vercel serverless before completing
+          try {
+            const comcashResult = await updateInventory(comcashPayload);
+            if (comcashResult.errors.length > 0) {
+              console.warn("Comcash sync: some items failed:", comcashResult.errors);
+            } else {
+              console.log(`Comcash sync: ${comcashResult.updated} items pushed successfully (deltas)`);
+            }
+          } catch (err) {
+            console.error("Comcash inventory push error:", err);
+          }
         }
       }
     } catch (comcashErr) {
