@@ -312,16 +312,23 @@ export async function POST(
       console.error("Shopify sync setup error:", shopifyErr);
     }
 
-    // Push updated stock levels to Comcash POS (non-blocking — log errors but don't fail the receiving)
+    // Push received quantities (deltas) to Comcash POS (non-blocking — log errors but don't fail the receiving)
+    // IMPORTANT: Comcash warehouse/changeQuantity expects a DELTA (qty to add/subtract), NOT absolute stock.
+    // For receiving, the delta is simply the qtyReceived for each item.
     try {
-      const comcashItemIds = lineItems
-        .map((li) => {
-          const recLine = receiving.lineItems.find(
-            (rl) => rl.id === li.receivingLineItemId
-          );
-          return recLine?.inventoryItemId;
-        })
-        .filter((iid): iid is string => !!iid);
+      // Build a map of inventoryItemId -> qtyReceived (the delta to push)
+      const deltaMap = new Map<string, number>();
+      for (const li of lineItems) {
+        if (li.qtyReceived <= 0) continue;
+        const recLine = receiving.lineItems.find(
+          (rl) => rl.id === li.receivingLineItemId
+        );
+        if (recLine?.inventoryItemId) {
+          deltaMap.set(recLine.inventoryItemId, li.qtyReceived);
+        }
+      }
+
+      const comcashItemIds = Array.from(deltaMap.keys());
 
       if (comcashItemIds.length > 0) {
         // Fetch items that have a comcashItemId (linked to Comcash POS)
@@ -330,14 +337,14 @@ export async function POST(
             id: { in: comcashItemIds },
             comcashItemId: { not: null },
           },
-          select: { comcashItemId: true, currentStock: true },
+          select: { id: true, comcashItemId: true },
         });
 
         if (comcashItems.length > 0) {
           const comcashPayload = comcashItems.map((item) => ({
             productId: parseInt(item.comcashItemId!, 10),
-            warehouseId: 1,
-            quantity: item.currentStock,
+            warehouseId: 2,
+            quantity: deltaMap.get(item.id) || 0, // Delta: qty received (positive = add stock)
           }));
 
           // Fire and forget — don't await so we don't block the response
@@ -350,7 +357,7 @@ export async function POST(
                 );
               } else {
                 console.log(
-                  `Comcash sync: ${comcashResult.updated} items pushed successfully`
+                  `Comcash sync: ${comcashResult.updated} items pushed successfully (deltas)`
                 );
               }
             })

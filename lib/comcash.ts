@@ -410,7 +410,7 @@ export async function updateInventory(
       try {
         await employeeApiRequest("/employee/warehouse/changeQuantity", {
           productId: item.productId,
-          warehouseId: item.warehouseId || 1, // Default warehouse
+          warehouseId: item.warehouseId || 2, // Default warehouse (2 = main stock warehouse)
           quantity: item.quantity,
         });
         updated++;

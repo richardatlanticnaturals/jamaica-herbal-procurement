@@ -1934,6 +1934,9 @@ async function handleSyncInventoryToComcash(
   const inventoryItemIds = (input.inventoryItemIds as string[]) || [];
 
   try {
+    // IMPORTANT: Comcash warehouse/changeQuantity expects a DELTA, NOT absolute stock.
+    // For manual sync, we must fetch current Comcash stock and compute the difference.
+
     // Get items to sync — either specific IDs or all with comcashItemId
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = { comcashItemId: { not: null } };
@@ -1959,23 +1962,77 @@ async function handleSyncInventoryToComcash(
       });
     }
 
-    // Authenticate with Comcash
-    const token = await authenticateEmployee();
+    // Step 1: Fetch current Comcash stock to compute deltas
+    // Use fetchProducts with includeWarehouse=true to get onHand data
+    const { fetchProducts } = await import("@/lib/comcash");
+    const comcashStockMap = new Map<string, number>(); // comcashItemId (string) -> current Comcash stock
 
-    // Push each item's stock to Comcash via warehouse/changeQuantity
+    // Paginate through all Comcash products to build a stock lookup
+    const pageLimit = 100;
+    let offset = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const { products, total } = await fetchProducts(offset, pageLimit, true);
+      if (products.length === 0) break;
+      for (const p of products) {
+        let stock = 0;
+        if (Array.isArray(p.onHand)) {
+          stock = Math.round(p.onHand.reduce((sum, wh) => sum + parseFloat(wh.quantity || "0"), 0));
+        } else if (typeof p.onHand === "number") {
+          stock = Math.round(p.onHand);
+        }
+        comcashStockMap.set(String(p.id), stock);
+      }
+      offset += products.length;
+      if (products.length < pageLimit) hasMore = false;
+      else if (total > 0 && offset >= total) hasMore = false;
+    }
+
+    // Step 2: Compute deltas (appStock - comcashStock) and only push non-zero deltas
+    const token = await authenticateEmployee();
     let synced = 0;
+    let skipped = 0;
     const errors: string[] = [];
+
+    // Build delta list
+    const deltaBatch: Array<{ productId: number; warehouseId: number; measureUnitId: number; quantity: number; name: string }> = [];
+    for (const item of items) {
+      const comcashId = item.comcashItemId!;
+      const comcashStock = comcashStockMap.get(comcashId) ?? 0;
+      const delta = item.currentStock - comcashStock;
+      if (delta === 0) {
+        skipped++;
+        continue;
+      }
+      deltaBatch.push({
+        productId: parseInt(comcashId, 10),
+        warehouseId: 2,
+        measureUnitId: 1,
+        quantity: delta, // Positive = add, Negative = subtract
+        name: item.name,
+      });
+    }
+
+    if (deltaBatch.length === 0) {
+      return JSON.stringify({
+        success: true,
+        synced: 0,
+        skipped: items.length,
+        total: items.length,
+        message: `All ${items.length} items already match Comcash stock — nothing to push`,
+      });
+    }
 
     // Batch items in groups of 25
     const batchSize = 25;
-    for (let i = 0; i < items.length; i += batchSize) {
-      const batch = items.slice(i, i + batchSize);
+    for (let i = 0; i < deltaBatch.length; i += batchSize) {
+      const batch = deltaBatch.slice(i, i + batchSize);
 
-      const products = batch.map((item) => ({
-        productId: parseInt(item.comcashItemId!, 10),
-        warehouseId: 1,
-        measureUnitId: 1,
-        quantity: item.currentStock,
+      const products = batch.map(({ productId, warehouseId, measureUnitId, quantity }) => ({
+        productId,
+        warehouseId,
+        measureUnitId,
+        quantity,
       }));
 
       try {
@@ -1989,7 +2046,7 @@ async function handleSyncInventoryToComcash(
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
-              note: `Sync from procurement app ${new Date().toISOString()}`,
+              note: `Delta sync from procurement app ${new Date().toISOString()}`,
               products,
             }),
           }
@@ -2011,9 +2068,10 @@ async function handleSyncInventoryToComcash(
     return JSON.stringify({
       success: synced > 0,
       synced,
+      skipped,
       total: items.length,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Synced ${synced} of ${items.length} items to Comcash POS${errors.length > 0 ? ` (${errors.length} batch errors)` : ""}`,
+      message: `Synced ${synced} of ${deltaBatch.length} items with stock differences to Comcash POS (${skipped} already matched)${errors.length > 0 ? ` (${errors.length} batch errors)` : ""}`,
     });
   } catch (err) {
     return JSON.stringify({
