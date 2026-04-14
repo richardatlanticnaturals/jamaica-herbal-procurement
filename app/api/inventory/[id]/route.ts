@@ -87,6 +87,7 @@ export async function PUT(
 
     // Only allow updating specific fields
     const data: Record<string, unknown> = {};
+    if (body.currentStock !== undefined) data.currentStock = Number(body.currentStock);
     if (body.reorderPoint !== undefined) data.reorderPoint = Number(body.reorderPoint);
     if (body.reorderQty !== undefined) data.reorderQty = Number(body.reorderQty);
     if (body.costPrice !== undefined) data.costPrice = Number(body.costPrice);
