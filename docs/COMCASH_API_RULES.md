@@ -65,3 +65,9 @@ JWT tokens expire. Cache and refresh before expiry (60s safety margin).
 3. `qtyUpdated` on products is NOT reliable for sales tracking — only updates on manual stock adjustments.
 4. `limit`/`offset` should be numbers, not strings.
 5. The Employee API needs JWT from `/employee/auth/signin`. The V2 endpoints need both `OPEN_API_KEY` header AND JWT.
+
+## Warehouse Configuration
+- **warehouseId: 2** = "Jamaican Herbal - Lauderdale Lakes" (the ONLY warehouse)
+- warehouseId 1 does NOT exist
+- All stock operations MUST use warehouseId: 2
+- measureUnitId varies per product — stored in InventoryItem.comcashMeasureUnitId

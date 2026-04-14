@@ -91,6 +91,7 @@ model InventoryItem {
   shopifyProductId String?
   shopifyVariantId String?
   comcashItemId    String?
+  comcashMeasureUnitId Int     @default(1) // measureUnitId for warehouse/changeQuantity (1=Each, 2=common)
   sku              String   @unique
   name             String
   vendorId         String?

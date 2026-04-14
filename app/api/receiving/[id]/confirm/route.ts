@@ -337,13 +337,14 @@ export async function POST(
             id: { in: comcashItemIds },
             comcashItemId: { not: null },
           },
-          select: { id: true, comcashItemId: true },
+          select: { id: true, comcashItemId: true, comcashMeasureUnitId: true },
         });
 
         if (comcashItems.length > 0) {
           const comcashPayload = comcashItems.map((item) => ({
             productId: parseInt(item.comcashItemId!, 10),
             warehouseId: 2,
+            measureUnitId: item.comcashMeasureUnitId || 1, // Use product-specific measureUnitId from DB
             quantity: deltaMap.get(item.id) || 0, // Delta: qty received (positive = add stock)
           }));
 

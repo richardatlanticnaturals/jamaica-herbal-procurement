@@ -33,6 +33,7 @@ export async function POST() {
         id: true,
         sku: true,
         comcashItemId: true,
+        comcashMeasureUnitId: true,
         currentStock: true,
       },
     });
@@ -75,7 +76,7 @@ export async function POST() {
     }
 
     // Step 2: Compute deltas and only push non-zero differences
-    const deltaPayload: Array<{ productId: number; warehouseId: number; quantity: number }> = [];
+    const deltaPayload: Array<{ productId: number; warehouseId: number; measureUnitId: number; quantity: number }> = [];
     let skipped = 0;
 
     for (const item of items) {
@@ -89,6 +90,7 @@ export async function POST() {
       deltaPayload.push({
         productId: parseInt(item.comcashItemId, 10),
         warehouseId: 2,
+        measureUnitId: item.comcashMeasureUnitId || 1, // Use product-specific measureUnitId from DB
         quantity: delta, // Positive = add stock, Negative = subtract stock
       });
     }

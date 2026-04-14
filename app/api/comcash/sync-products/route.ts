@@ -103,12 +103,13 @@ export async function POST() {
           });
 
           if (existing) {
-            // Update fields from Comcash — stock, prices, vendor, comcashItemId
+            // Update fields from Comcash — stock, prices, vendor, comcashItemId, measureUnitId
             await tx.inventoryItem.update({
               where: { sku },
               data: {
                 name,
                 comcashItemId: String(product.id),
+                comcashMeasureUnitId: product.unitOfMeasureId || existing.comcashMeasureUnitId || 1,
                 retailPrice: retailPrice,
                 costPrice: costPrice > 0 ? costPrice : existing.costPrice,
                 // DO NOT update currentStock here — product sync runs without warehouseIds
@@ -125,6 +126,7 @@ export async function POST() {
                 sku,
                 name,
                 comcashItemId: String(product.id),
+                comcashMeasureUnitId: product.unitOfMeasureId || 1,
                 retailPrice: retailPrice,
                 costPrice: costPrice,
                 currentStock: onHand,

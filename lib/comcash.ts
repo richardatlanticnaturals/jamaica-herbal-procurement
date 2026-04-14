@@ -64,6 +64,7 @@ export interface ComcashProduct {
   created?: number;
   updated?: number;
   qtyUpdated?: number;
+  unitOfMeasureId?: number;
 }
 
 export interface ComcashAuthResponse {
@@ -395,6 +396,7 @@ export async function updateInventory(
   items: Array<{
     productId: number;
     warehouseId?: number;
+    measureUnitId?: number;
     quantity: number;
   }>
 ): Promise<{ updated: number; errors: string[] }> {
@@ -411,6 +413,7 @@ export async function updateInventory(
         await employeeApiRequest("/employee/warehouse/changeQuantity", {
           productId: item.productId,
           warehouseId: item.warehouseId || 2, // Default warehouse (2 = main stock warehouse)
+          measureUnitId: item.measureUnitId || 1, // Use product-specific measureUnitId (1=Each default)
           quantity: item.quantity,
         });
         updated++;

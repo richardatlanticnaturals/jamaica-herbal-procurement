@@ -1951,6 +1951,7 @@ async function handleSyncInventoryToComcash(
         name: true,
         sku: true,
         comcashItemId: true,
+        comcashMeasureUnitId: true,
         currentStock: true,
       },
     });
@@ -2007,7 +2008,7 @@ async function handleSyncInventoryToComcash(
       deltaBatch.push({
         productId: parseInt(comcashId, 10),
         warehouseId: 2,
-        measureUnitId: 1,
+        measureUnitId: item.comcashMeasureUnitId || 1, // Use product-specific measureUnitId from DB
         quantity: delta, // Positive = add, Negative = subtract
         name: item.name,
       });

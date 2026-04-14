@@ -185,13 +185,14 @@ export async function POST(request: NextRequest) {
             id: { in: updatedItemIds },
             comcashItemId: { not: null },
           },
-          select: { id: true, comcashItemId: true },
+          select: { id: true, comcashItemId: true, comcashMeasureUnitId: true },
         })
         .then((comcashItems) => {
           if (comcashItems.length === 0) return;
           const payload = comcashItems.map((item) => ({
             productId: parseInt(item.comcashItemId!, 10),
             warehouseId: 2,
+            measureUnitId: item.comcashMeasureUnitId || 1, // Use product-specific measureUnitId from DB
             quantity: deltaMap.get(item.id) || 0, // Delta: qty received (positive = add stock)
           }));
           return updateInventory(payload);
