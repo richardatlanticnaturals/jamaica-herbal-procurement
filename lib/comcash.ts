@@ -222,16 +222,25 @@ export async function fetchVendors(): Promise<ComcashVendor[]> {
  */
 export async function fetchProducts(
   offset: number = 0,
-  limit: number = 100
+  limit: number = 100,
+  includeWarehouse: boolean = false
 ): Promise<{ products: ComcashProduct[]; total: number }> {
-  const response = await employeeApiRequest<
-    ComcashProductListResponse | ComcashProduct[] | ComcashProduct
-  >("/employee/product/list", {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body: any = {
     offset,
     limit,
     sort: "title",
     order: "asc",
-    warehouseIds: [1, 2, 3], // Required to get onHand stock data
+  };
+  // Only include warehouseIds when we need stock data
+  // WITHOUT it: returns ALL products (even new ones with no warehouse)
+  // WITH it: returns only products assigned to warehouses (misses new items)
+  if (includeWarehouse) {
+    body.warehouseIds = [1, 2, 3];
+  }
+  const response = await employeeApiRequest<
+    ComcashProductListResponse | ComcashProduct[] | ComcashProduct
+  >("/employee/product/list", body
   });
 
   // Handle various response shapes the API might return

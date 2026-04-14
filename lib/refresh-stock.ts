@@ -57,7 +57,7 @@ export async function refreshStock(): Promise<RefreshStockResult> {
     let hasMore = true;
 
     while (hasMore) {
-      const { products, total } = await fetchProducts(offset, limit);
+      const { products, total } = await fetchProducts(offset, limit, true); // includeWarehouse=true for stock data
 
       if (products.length === 0) {
         hasMore = false;
