@@ -111,7 +111,8 @@ export async function POST() {
                 comcashItemId: String(product.id),
                 retailPrice: retailPrice,
                 costPrice: costPrice > 0 ? costPrice : existing.costPrice,
-                currentStock: onHand,
+                // DO NOT update currentStock here — product sync runs without warehouseIds
+                // so onHand is 0/empty for most items. Use refresh-stock for stock updates.
                 vendorId: vendorId || existing.vendorId,
                 isActive: product.statusId === 1,
                 lastSyncedAt: new Date(),
