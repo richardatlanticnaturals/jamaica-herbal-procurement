@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -142,6 +144,8 @@ interface InventorySearchResult {
 // ---------- Component ----------
 
 export default function ReceivingPage() {
+  const router = useRouter();
+
   // Receive mode toggle: "po" (existing) or "quick" (new)
   const [receiveMode, setReceiveMode] = useState<ReceiveMode>("po");
 
@@ -2112,9 +2116,10 @@ export default function ReceivingPage() {
               {/* Mobile: card list */}
               <div className="md:hidden space-y-2">
                 {pastReceivings.map((rec) => (
-                  <div
+                  <Link
                     key={rec.id}
-                    className="p-3 rounded-lg border space-y-1"
+                    href={`/receiving/${rec.id}`}
+                    className="block p-3 rounded-lg border space-y-1 hover:bg-muted/50 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-sm font-semibold">
@@ -2136,7 +2141,7 @@ export default function ReceivingPage() {
                       )}
                       <span>{rec._count.lineItems} items</span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
 
@@ -2167,7 +2172,11 @@ export default function ReceivingPage() {
                   </thead>
                   <tbody>
                     {pastReceivings.map((rec) => (
-                      <tr key={rec.id} className="border-b">
+                      <tr
+                        key={rec.id}
+                        className="border-b hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/receiving/${rec.id}`)}
+                      >
                         <td className="p-3 text-sm">
                           {new Date(
                             rec.receivedDate

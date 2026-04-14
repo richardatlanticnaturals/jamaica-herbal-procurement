@@ -240,8 +240,7 @@ export async function fetchProducts(
   }
   const response = await employeeApiRequest<
     ComcashProductListResponse | ComcashProduct[] | ComcashProduct
-  >("/employee/product/list", body
-  });
+  >("/employee/product/list", body);
 
   // Handle various response shapes the API might return
   if (Array.isArray(response)) {
