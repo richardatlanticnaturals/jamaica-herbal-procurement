@@ -325,15 +325,26 @@ export default function InventoryPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setPushResult(`Pushed ${data.synced || 0} items to Comcash POS`);
+        // API returns { updated, skipped, total, errors, message }
+        const updated = data.updated || 0;
+        const skipped = data.skipped || 0;
+        const errCount = data.errors?.length || 0;
+        if (errCount > 0) {
+          setPushResult(`Error: Pushed ${updated} items but ${errCount} failed — ${data.errors.slice(0, 3).join("; ")}`);
+        } else if (updated === 0) {
+          setPushResult(`All ${skipped} items already match Comcash stock — nothing to push`);
+        } else {
+          setPushResult(`Pushed ${updated} items to Comcash POS (${skipped} already matched)`);
+        }
       } else {
         setPushResult(`Error: ${data.error || "Failed to push"}`);
       }
     } catch {
-      setPushResult("Failed to push to Comcash");
+      setPushResult("Error: Failed to connect to Comcash");
     } finally {
       setPushingToComcash(false);
-      setTimeout(() => setPushResult(null), 5000);
+      // Keep notification visible for 8 seconds so user can read it
+      setTimeout(() => setPushResult(null), 8000);
     }
   }, []);
 
@@ -669,10 +680,10 @@ export default function InventoryPage() {
       )}
       {pushResult && (
         <div
-          className={`rounded-lg px-4 py-3 text-sm ${
+          className={`rounded-lg px-4 py-3 text-sm font-medium ${
             pushResult.startsWith("Error")
-              ? "bg-red-50 text-red-700"
-              : "bg-green-50 text-green-700"
+              ? "bg-red-50 text-red-700 border border-red-200"
+              : "bg-green-50 text-green-700 border border-green-200"
           }`}
         >
           {pushResult}
