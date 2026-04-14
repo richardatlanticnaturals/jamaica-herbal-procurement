@@ -9,7 +9,8 @@ import { requireAuth } from "@/lib/api-auth";
  * fuzzy-match items against the entire inventory, and return
  * matched results for user review. Does NOT update stock.
  *
- * Body: { image: string (base64), locationCode?: "LL" | "NL" }
+ * Body (multi-image): { images: string[] (base64 array), locationCode?: "LL" | "NL" }
+ * Body (legacy single): { image: string (base64), locationCode?: "LL" | "NL" }
  */
 
 // ---------- Similarity helpers (reuse logic from lib/fuzzy-match.ts) ----------
@@ -127,24 +128,94 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { image, locationCode } = body as {
-      image: string;
+    const { image, images, locationCode } = body as {
+      image?: string;
+      images?: string[];
       locationCode?: "LL" | "NL";
     };
 
-    if (!image) {
+    // Support both single image (legacy) and multi-image array
+    const imageList: string[] = images && images.length > 0
+      ? images
+      : image
+        ? [image]
+        : [];
+
+    if (imageList.length === 0) {
       return NextResponse.json(
-        { error: "image (base64) is required" },
+        { error: "At least one image (base64) is required" },
         { status: 400 }
       );
     }
 
-    // Step 1: OCR the invoice/packing slip
-    const ocrResult = await ocrDeliverySlip(image);
+    // Step 1: OCR all images/PDFs and merge results
+    // Process each image sequentially to avoid API rate limits
+    const allOcrItems: OcrItem[] = [];
+    let vendorName: string | null = null;
+    let invoiceNumber: string | null = null;
+    let invoiceDate: string | null = null;
+
+    for (let i = 0; i < imageList.length; i++) {
+      console.log(`[Quick OCR] Processing file ${i + 1} of ${imageList.length}...`);
+      const ocrResult = await ocrDeliverySlip(imageList[i]);
+
+      // Keep the first non-null vendor/invoice/date metadata
+      if (!vendorName && ocrResult.vendorName) vendorName = ocrResult.vendorName;
+      if (!invoiceNumber && ocrResult.invoiceNumber) invoiceNumber = ocrResult.invoiceNumber;
+      if (!invoiceDate && ocrResult.date) invoiceDate = ocrResult.date;
+
+      allOcrItems.push(...ocrResult.items);
+    }
+
+    // Step 1b: Deduplicate items from multiple pages (same SKU or very similar name)
+    const deduplicatedItems: OcrItem[] = [];
+    for (const item of allOcrItems) {
+      let merged = false;
+      for (const existing of deduplicatedItems) {
+        // Check SKU match first (if both have SKUs)
+        if (item.sku && existing.sku) {
+          const skuSim = skuMatch(item.sku, existing.sku);
+          if (skuSim >= 0.9) {
+            // Same SKU: merge quantities
+            existing.qty += item.qty;
+            // Keep the higher unit price (in case one page had it and another didn't)
+            if (item.unitPrice !== null && (existing.unitPrice === null || item.unitPrice > existing.unitPrice)) {
+              existing.unitPrice = item.unitPrice;
+            }
+            merged = true;
+            break;
+          }
+        }
+        // Check name similarity
+        const nameSim = similarity(item.name, existing.name);
+        if (nameSim >= 0.85) {
+          // Very similar name: merge quantities
+          existing.qty += item.qty;
+          if (item.unitPrice !== null && (existing.unitPrice === null || item.unitPrice > existing.unitPrice)) {
+            existing.unitPrice = item.unitPrice;
+          }
+          // If the new item has a SKU and existing doesn't, adopt it
+          if (item.sku && !existing.sku) existing.sku = item.sku;
+          merged = true;
+          break;
+        }
+      }
+      if (!merged) {
+        deduplicatedItems.push({ ...item });
+      }
+    }
+
+    // Build combined OCR result
+    const ocrResult = {
+      vendorName,
+      invoiceNumber,
+      date: invoiceDate,
+      items: deduplicatedItems,
+    };
 
     if (ocrResult.items.length === 0) {
       return NextResponse.json(
-        { error: "No items could be extracted from the image. Try a clearer photo." },
+        { error: "No items could be extracted from the uploaded files. Try clearer photos." },
         { status: 422 }
       );
     }

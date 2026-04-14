@@ -24,6 +24,9 @@ import {
   Zap,
   Search,
   MapPin,
+  Plus,
+  X,
+  ImageIcon,
 } from "lucide-react";
 
 // ---------- Types ----------
@@ -141,6 +144,14 @@ interface InventorySearchResult {
   currentStock: number;
 }
 
+// Multi-file upload type for Quick Receive
+interface QuickFile {
+  name: string;
+  base64: string;
+  isPdf: boolean;
+  previewUrl: string | null; // object URL for image thumbnails, null for PDFs
+}
+
 // ---------- Component ----------
 
 export default function ReceivingPage() {
@@ -196,11 +207,9 @@ export default function ReceivingPage() {
   // ========== Quick Receive State ==========
   const quickFileInputRef = useRef<HTMLInputElement>(null);
   const quickGalleryInputRef = useRef<HTMLInputElement>(null);
+  const quickAddMoreInputRef = useRef<HTMLInputElement>(null);
   const quickDropZoneRef = useRef<HTMLDivElement>(null);
-  const [quickImageBase64, setQuickImageBase64] = useState<string | null>(null);
-  const [quickImagePreview, setQuickImagePreview] = useState<string | null>(null);
-  const [quickFileName, setQuickFileName] = useState<string | null>(null);
-  const [quickIsPdf, setQuickIsPdf] = useState(false);
+  const [quickFiles, setQuickFiles] = useState<QuickFile[]>([]);
   const [quickIsDragOver, setQuickIsDragOver] = useState(false);
   const [quickLocationCode, setQuickLocationCode] = useState<"LL" | "NL">("LL");
   const [quickProcessing, setQuickProcessing] = useState(false);
@@ -460,30 +469,52 @@ export default function ReceivingPage() {
 
   // ========== Quick Receive Handlers ==========
 
-  const handleQuickFileSelect = (file: File) => {
+  // Add one or more files to the quickFiles array
+  const handleQuickFilesAdd = (fileList: File[]) => {
     setQuickError(null);
-    setQuickResult(null);
-    setQuickConfirmed(false);
 
-    const isFilePdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    setQuickIsPdf(isFilePdf);
-    setQuickFileName(file.name);
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "application/pdf"];
 
-    if (quickImagePreview) URL.revokeObjectURL(quickImagePreview);
-    if (isFilePdf) {
-      setQuickImagePreview(null);
-    } else {
-      setQuickImagePreview(URL.createObjectURL(file));
+    for (const file of fileList) {
+      const isValidByType = validTypes.includes(file.type);
+      const isValidByExt = /\.(jpg|jpeg|png|gif|webp|heic|pdf)$/i.test(file.name);
+      if (!isValidByType && !isValidByExt) {
+        setQuickError("Some files were skipped. Only JPG, PNG, HEIC, and PDF files are accepted.");
+        continue;
+      }
+
+      const isFilePdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      const previewUrl = isFilePdf ? null : URL.createObjectURL(file);
+
+      // Read as base64 and append to quickFiles
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        setQuickFiles((prev) => [
+          ...prev,
+          { name: file.name, base64, isPdf: isFilePdf, previewUrl },
+        ]);
+      };
+      reader.readAsDataURL(file);
     }
-
-    const reader = new FileReader();
-    reader.onload = () => setQuickImageBase64(reader.result as string);
-    reader.readAsDataURL(file);
   };
 
+  // Remove a file from the array by index
+  const handleQuickFileRemove = (index: number) => {
+    setQuickFiles((prev) => {
+      const removed = prev[index];
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  // File input handler (camera or gallery) -- supports multiple
   const handleQuickImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleQuickFileSelect(file);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    handleQuickFilesAdd(Array.from(files));
+    // Reset input so same file can be re-selected
+    e.target.value = "";
   };
 
   const handleQuickDragOver = useCallback((e: React.DragEvent) => {
@@ -506,32 +537,29 @@ export default function ReceivingPage() {
     setQuickIsDragOver(false);
     const files = e.dataTransfer.files;
     if (files.length === 0) return;
-    const file = files[0];
-    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "application/pdf"];
-    const isValidByType = validTypes.includes(file.type);
-    const isValidByExt = /\.(jpg|jpeg|png|gif|webp|heic|pdf)$/i.test(file.name);
-    if (!isValidByType && !isValidByExt) {
-      setQuickError("Please drop an image (JPG, PNG, HEIC) or PDF file.");
-      return;
-    }
-    handleQuickFileSelect(file);
-  }, [quickImagePreview]);
+    handleQuickFilesAdd(Array.from(files));
+  }, []);
 
-  // Process Quick Receive OCR
+  // Process Quick Receive OCR -- sends all files to the API
   const handleQuickProcess = async () => {
-    if (!quickImageBase64) return;
+    if (quickFiles.length === 0) return;
     setQuickProcessing(true);
     setQuickError(null);
     setQuickResult(null);
     setQuickConfirmed(false);
-    setQuickProcessingStep("Running OCR on invoice...");
+
+    const totalFiles = quickFiles.length;
+    setQuickProcessingStep(`Running OCR on ${totalFiles} file${totalFiles > 1 ? "s" : ""}...`);
 
     try {
+      // Build the images array from all files
+      const images = quickFiles.map((f) => f.base64);
+
       const res = await fetch("/api/receiving/quick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          image: quickImageBase64,
+          images,
           locationCode: quickLocationCode,
         }),
       });
@@ -618,11 +646,9 @@ export default function ReceivingPage() {
 
   // Reset Quick Receive
   const handleQuickReset = () => {
-    if (quickImagePreview) URL.revokeObjectURL(quickImagePreview);
-    setQuickImageBase64(null);
-    setQuickImagePreview(null);
-    setQuickFileName(null);
-    setQuickIsPdf(false);
+    // Revoke all preview URLs to avoid memory leaks
+    quickFiles.forEach((f) => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
+    setQuickFiles([]);
     setQuickIsDragOver(false);
     setQuickResult(null);
     setQuickEditableItems([]);
@@ -634,6 +660,7 @@ export default function ReceivingPage() {
     setInventorySearchResults([]);
     if (quickFileInputRef.current) quickFileInputRef.current.value = "";
     if (quickGalleryInputRef.current) quickGalleryInputRef.current.value = "";
+    if (quickAddMoreInputRef.current) quickAddMoreInputRef.current.value = "";
   };
 
   // Update qty for a quick receive item
@@ -1140,7 +1167,7 @@ export default function ReceivingPage() {
                   </div>
                 </div>
               ) : (
-                /* ---- Quick Receive Upload ---- */
+                /* ---- Quick Receive Upload (Multi-file) ---- */
                 <div className="space-y-4">
                   {/* Location selector */}
                   <div className="space-y-2">
@@ -1150,7 +1177,7 @@ export default function ReceivingPage() {
                     </p>
                   </div>
 
-                  {/* Hidden file inputs */}
+                  {/* Hidden file inputs -- camera (single), gallery (multi), add-more (multi) */}
                   <input
                     ref={quickFileInputRef}
                     type="file"
@@ -1164,13 +1191,23 @@ export default function ReceivingPage() {
                     ref={quickGalleryInputRef}
                     type="file"
                     accept="image/*,.pdf,application/pdf"
+                    multiple
+                    onChange={handleQuickImageSelect}
+                    className="hidden"
+                    disabled={quickProcessing}
+                  />
+                  <input
+                    ref={quickAddMoreInputRef}
+                    type="file"
+                    accept="image/*,.pdf,application/pdf"
+                    multiple
                     onChange={handleQuickImageSelect}
                     className="hidden"
                     disabled={quickProcessing}
                   />
 
-                  {/* Drop zone */}
-                  {!quickImageBase64 && (
+                  {/* Drop zone -- shown when no files uploaded yet */}
+                  {quickFiles.length === 0 && (
                     <div
                       ref={quickDropZoneRef}
                       onDragOver={handleQuickDragOver}
@@ -1197,18 +1234,18 @@ export default function ReceivingPage() {
                         </div>
                         <div>
                           <p className={`text-sm font-medium ${quickIsDragOver ? "text-primary" : "text-foreground"}`}>
-                            {quickIsDragOver ? "Drop file here" : "Drag invoice or packing slip here"}
+                            {quickIsDragOver ? "Drop files here" : "Drag invoice pages here"}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Supports JPG, PNG, HEIC, and PDF files
+                            Upload multiple pages -- JPG, PNG, HEIC, or PDF
                           </p>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Mobile upload buttons */}
-                  {!quickImageBase64 && (
+                  {/* Mobile upload buttons -- shown when no files yet */}
+                  {quickFiles.length === 0 && (
                     <div className="md:hidden space-y-3">
                       <Button
                         onClick={() => quickFileInputRef.current?.click()}
@@ -1227,13 +1264,13 @@ export default function ReceivingPage() {
                         style={{ minHeight: "48px" }}
                       >
                         <Upload className="h-5 w-5" />
-                        Upload File
+                        Upload Files
                       </Button>
                     </div>
                   )}
 
-                  {/* Desktop upload buttons */}
-                  {!quickImageBase64 && (
+                  {/* Desktop upload buttons -- shown when no files yet */}
+                  {quickFiles.length === 0 && (
                     <div className="hidden md:flex gap-3">
                       <Button
                         variant="outline"
@@ -1251,32 +1288,115 @@ export default function ReceivingPage() {
                         className="gap-2"
                       >
                         <Upload className="h-4 w-4" />
-                        Upload File
+                        Upload Files
                       </Button>
                     </div>
                   )}
 
-                  {/* File preview */}
-                  {quickImageBase64 && (
+                  {/* ---- Uploaded Files List (multi-file cards) ---- */}
+                  {quickFiles.length > 0 && (
                     <div className="space-y-3">
-                      {quickIsPdf ? (
-                        <div className="flex items-center gap-3 p-4 rounded-lg border bg-muted/50">
-                          <FileText className="h-8 w-8 text-red-500 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{quickFileName}</p>
-                            <p className="text-xs text-muted-foreground">PDF document ready for OCR</p>
-                          </div>
-                        </div>
-                      ) : quickImagePreview ? (
-                        <div className="relative rounded-lg overflow-hidden border max-h-64">
-                          <img
-                            src={quickImagePreview}
-                            alt="Invoice preview"
-                            className="w-full h-auto max-h-64 object-contain"
-                          />
-                        </div>
-                      ) : null}
+                      {/* File count badge */}
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <ImageIcon className="h-3 w-3" />
+                          {quickFiles.length} file{quickFiles.length !== 1 ? "s" : ""} uploaded
+                        </Badge>
+                      </div>
 
+                      {/* Horizontal scrollable file cards -- wraps on mobile */}
+                      <div
+                        ref={quickDropZoneRef}
+                        onDragOver={handleQuickDragOver}
+                        onDragLeave={handleQuickDragLeave}
+                        onDrop={handleQuickDrop}
+                        className={`flex flex-wrap gap-3 p-3 rounded-lg border-2 border-dashed transition-colors ${
+                          quickIsDragOver ? "border-primary bg-primary/5" : "border-transparent"
+                        }`}
+                      >
+                        {quickFiles.map((file, idx) => (
+                          <div
+                            key={idx}
+                            className="relative group rounded-lg border bg-muted/30 overflow-hidden"
+                            style={{ width: "120px" }}
+                          >
+                            {/* Thumbnail or PDF icon */}
+                            {file.isPdf ? (
+                              <div className="flex flex-col items-center justify-center h-24 bg-red-50">
+                                <FileText className="h-8 w-8 text-red-500" />
+                                <span className="text-[10px] text-red-600 font-medium mt-1">PDF</span>
+                              </div>
+                            ) : file.previewUrl ? (
+                              <div className="h-24 overflow-hidden">
+                                <img
+                                  src={file.previewUrl}
+                                  alt={file.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center h-24 bg-muted">
+                                <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                              </div>
+                            )}
+                            {/* File name */}
+                            <div className="px-2 py-1.5">
+                              <p className="text-[11px] text-muted-foreground truncate" title={file.name}>
+                                {file.name}
+                              </p>
+                            </div>
+                            {/* Remove button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleQuickFileRemove(idx);
+                              }}
+                              className="absolute top-1 right-1 rounded-full bg-black/60 text-white p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+                              disabled={quickProcessing}
+                              aria-label={`Remove ${file.name}`}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+
+                        {/* Add More card */}
+                        <button
+                          onClick={() => quickAddMoreInputRef.current?.click()}
+                          disabled={quickProcessing}
+                          className="flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 bg-muted/20 hover:bg-muted/40 transition-colors"
+                          style={{ width: "120px", minHeight: "120px" }}
+                        >
+                          <Plus className="h-6 w-6 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Add More</span>
+                        </button>
+                      </div>
+
+                      {/* Mobile: camera + add more buttons */}
+                      <div className="md:hidden flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => quickFileInputRef.current?.click()}
+                          disabled={quickProcessing}
+                          className="flex-1 gap-2"
+                          size="sm"
+                        >
+                          <Camera className="h-4 w-4" />
+                          Take Photo
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => quickAddMoreInputRef.current?.click()}
+                          disabled={quickProcessing}
+                          className="flex-1 gap-2"
+                          size="sm"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Upload More
+                        </Button>
+                      </div>
+
+                      {/* Process + Clear buttons */}
                       <div className="flex gap-3">
                         <Button
                           onClick={handleQuickProcess}
@@ -1291,7 +1411,7 @@ export default function ReceivingPage() {
                           ) : (
                             <>
                               <PackageCheck className="h-4 w-4" />
-                              Process Invoice
+                              Process Invoice ({quickFiles.length} file{quickFiles.length !== 1 ? "s" : ""})
                             </>
                           )}
                         </Button>
