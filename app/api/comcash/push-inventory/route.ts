@@ -22,19 +22,13 @@ export async function POST() {
       select: { lastInventorySync: true },
     });
 
-    // Find all inventory items with a comcashItemId that have been updated
-    // since last sync (or all if never synced)
-    const whereClause: Record<string, unknown> = {
-      comcashItemId: { not: null },
-      isActive: true,
-    };
-
-    if (settings?.lastInventorySync) {
-      whereClause.updatedAt = { gt: settings.lastInventorySync };
-    }
-
+    // Find ALL inventory items with a comcashItemId — we compute deltas against
+    // Comcash live stock, so we always check everything (not just recently updated)
     const items = await prisma.inventoryItem.findMany({
-      where: whereClause,
+      where: {
+        comcashItemId: { not: null },
+        isActive: true,
+      },
       select: {
         id: true,
         sku: true,
