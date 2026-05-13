@@ -721,6 +721,7 @@ export default function PODetailPage() {
                     <TableHead>SKU</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-center">Stock</TableHead>
+                    <TableHead className="text-center">Sold (4mo)</TableHead>
                     <TableHead className="w-28">Qty</TableHead>
                     <TableHead className="w-32">Unit Cost</TableHead>
                     <TableHead className="text-right w-28">Line Total</TableHead>
@@ -738,6 +739,11 @@ export default function PODetailPage() {
                         <Badge variant="secondary">
                           {item.inventoryItem?.currentStock ?? "--"}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={(po.lineItems?.find((li: any) => li.id === item.id)?.qtySold4mo || 0) > 0 ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                          {po.lineItems?.find((li: any) => li.id === item.id)?.qtySold4mo || "—"}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <Input
